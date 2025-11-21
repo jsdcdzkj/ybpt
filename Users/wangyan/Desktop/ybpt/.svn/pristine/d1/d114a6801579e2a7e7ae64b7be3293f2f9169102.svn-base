@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jsdc.ybpt.mapper.appropNotice.AppropNoticeSummaryMapper">
+    <select id="mergeData" resultType="com.jsdc.ybpt.appropNotice.entity.AppropNoticeSummary">
+        select
+            YEAR,MONTH,RYLB,
+            sum(LJ_FSZFY) as ljFszfy,sum(LJ_TCJJFSJE) as ljTcjjfsje,
+            sum(LJ_DBJJFSJE) as ljDbjjfsje, sum(LJ_GWYJJFSJE) as ljGwyjjfsje,
+            sum(LJ_JZJJFSJE) as ljJzjjfsje, sum(LJ_SCJJFSJE) as ljScjjfsje, sum(LJ_GZJJFSJE) as ljGzjjfsje,
+            sum(LJ_GJZHFSJE) as ljGjzhfsje, sum(LJ_XJ) as ljXj, sum(LJ_JSXJ) as ljJsxj,
+            sum(LJ_TCJJJSJE) as ljTcjjjsje, sum(LJ_DBJJJSJE) as ljDbjjjsje, sum(LJ_GWYJJJSJE) as ljGwyjjjsje,
+            sum(LJ_JZJJJSJE) as ljJzjjjsje, sum(LJ_SCJJJSJE) as ljScjjjsje, sum(LJ_GZJJJSJE) as ljGzjjjsje,
+            sum(LJ_GJZHJSJE) as ljGjzhjsje, sum(LJ_JJBFXJ) as ljJjbfxj, sum(LJ_JJBFJE) as ljJjbfje,
+            sum(LJ_DBSBBFJE) as ljDbsbbfje, sum(LJ_KHBZJ) as ljKhbzj, sum(LJ_KK) as ljKk,
+            sum(DY_FSZFY) as dyFszfy, sum(DY_TCJJFSJE) as dyTcjjfsje, sum(DY_DBJJFSJE) as dyDbjjfsje,
+            sum(DY_GWYJJFSJE) as dyGwyjjfsje, sum(DY_JZJJFSJE) as dyJzjjfsje, sum(DY_SCJJFSJE) as dyScjjfsje,
+            sum(DY_GZJJFSJE) as dyGzjjfsje, sum(DY_GJZHFSJE) as dyGjzhfsje, sum(DY_XJ) as dyXj,
+            sum(DY_JSXJ) as dyJsxj, sum(DY_TCJJJSJE) as dyTcjjjsje, sum(DY_DBJJJSJE) as dyDbjjjsje,
+            sum(DY_GWYJJJSJE) as dyGwyjjjsje, sum(DY_JZJJJSJE) as dyJzjjjsje, sum(DY_SCJJJSJE) as dyScjjjsje,
+            sum(DY_GZJJJSJE) as dyGzjjjsje, sum(DY_GJZHJSJE) as dyGjzhjsje, sum(DY_JJBFXJ) as dyJjbfxj,
+            sum(DY_JJBFJE) as dyJjbfje, sum(DY_DBSBBFJE) as dyDbsbbfje, sum(DY_KHBZJ) as dyKhbzj, sum(DY_KK) as dyKk
+        from approp_notice_summary
+        where YEAR = #{year} and MONTH = #{month}
+        <if test="tcqList != null and tcqList.size > 0">
+            and TCQ in
+            <foreach collection="tcqList" item="tcq" open="(" close=")" separator=",">
+                #{tcq}
+            </foreach>
+        </if>
+        AND IS_DEL = '0'
+        group by YEAR, MONTH,RYLB
+    </select>
+
+</mapper>
+
+

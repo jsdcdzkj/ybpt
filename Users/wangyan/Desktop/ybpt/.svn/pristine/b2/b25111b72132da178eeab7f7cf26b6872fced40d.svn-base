@@ -1,0 +1,491 @@
+<template>
+  <div class="main-container">
+    <el-row :gutter="20">
+      <el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+        <el-card class="card" shadow="never">
+          <div slot="header">
+            <span class="tips">信息查询</span>
+            <div class="right">
+              <el-button
+                icon="el-icon-search"
+                type="primary"
+                @click="queryData()"
+              >
+                查 询
+              </el-button>
+              <el-button icon="el-icon-refresh-left " @click="fetchData1()">
+                重 置
+              </el-button>
+            </div>
+          </div>
+          <el-form label-width="100px">
+            <el-row :gutter="20">
+              <el-col :xs="24" :sm="24" :md="6" :lg="6" :xl="6">
+                <el-form-item label="姓名">
+                  <el-input
+                    v-model.trim="queryForm.name"
+                    @keyup.enter.native="fetchData()"
+                  />
+                </el-form-item>
+              </el-col>
+              <!-- <el-col :xs="24" :sm="24" :md="6" :lg="6" :xl="6">
+                <el-form-item label="证件类型">
+                  <el-select v-model="queryForm.cardType" clearable class="w">
+                    <el-option label="居民身份证" value="1"></el-option>
+                    <el-option
+                      label="澳门特区护照/港澳居民来往内地通行证"
+                      value="2"
+                    ></el-option>
+                  </el-select>
+                </el-form-item>
+              </el-col> -->
+              <el-col :xs="24" :sm="24" :md="6" :lg="6" :xl="6">
+                <el-form-item label="证件号">
+                  <el-input
+                    v-model.trim="queryForm.num"
+                    @keyup.enter.native="fetchData()"
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="24" :md="6" :lg="6" :xl="6" v-show="isShow">
+                <el-form-item label="单位编码">
+                  <el-input
+                    v-model.trim="queryForm.ecode"
+                    @keyup.enter.native="fetchData()"
+                  />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-form>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+        <el-card class="card tablecard" shadow="never">
+          <div slot="header">
+            <span class="tips">异地安置管理列表</span>
+            <div class="right">
+              <el-button
+                type="warning"
+                icon="el-icon-edit"
+                @click="dialogFormVisible = true"
+                v-show="isShow"
+              >
+                异地安置开关
+              </el-button>
+              <el-button
+                type="success"
+                icon="el-icon-plus"
+                @click="handleAdd"
+                v-show="isOpen"
+              >
+                新增
+              </el-button>
+              <el-button
+                type="primary"
+                icon="el-icon-upload2"
+                @click="handleExport"
+              >
+                <!-- <a style="color:aliceblue" @click="handleExport"></a> -->
+                导出
+              </el-button>
+              <el-button
+                type="danger"
+                icon="el-icon-delete"
+                @click="handleDelete"
+              >
+                全部删除
+              </el-button>
+            </div>
+          </div>
+          <el-table
+            v-loading="listLoading"
+            ref="listTable"
+            stripe
+            :data="list"
+            :element-loading-text="elementLoadingText"
+            highlight-current-row
+            border
+            @current-change="handleCurrentChange"
+            height="calc(100% - 50px)"
+            @selection-change="setSelectRows"
+          >
+            <template slot="empty">
+              <el-empty :image-size="200"></el-empty>
+            </template>
+            <el-table-column
+              show-overflow-tooltip
+              type="selection"
+              align="center"
+            ></el-table-column>
+            <el-table-column
+              label="序号"
+              width="80"
+              align="center"
+              show-overflow-tooltip
+            >
+              <template #default="scope">
+                {{
+                  (queryForm.pageNo - 1) * queryForm.pageSize + scope.$index + 1
+                }}
+              </template>
+            </el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              label="姓名"
+              align="center"
+              prop="name"
+              width="120px"
+            ></el-table-column>
+            <!-- <el-table-column show-overflow-tooltip prop="sex" width="120px" label="性别" align="center" :formatter="sex">
+            </el-table-column> -->
+            <el-table-column
+              show-overflow-tooltip
+              prop="age"
+              label="年龄"
+              align="center"
+              width="120px"
+            ></el-table-column>
+            <el-table-column
+              width="200px"
+              prop="cardType"
+              label="证件类型"
+              align="center"
+            >
+              <template slot-scope="scope">
+                <!-- 1:居民身份证
+                2:澳门特区护照/港澳居民来往内地通行证 -->
+                <span
+                  v-text="
+                    scope.row.cardType == 2
+                      ? '澳门特区护照/港澳居民来往内地通行证'
+                      : '居民身份证'
+                  "
+                ></span>
+              </template>
+            </el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="num"
+              label="证件号"
+              align="center"
+              width="200px"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="phone"
+              label="负责人电话"
+              align="center"
+              width="200px"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="admdvs"
+              label="统筹区"
+              align="center"
+              width="120px"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="medplace"
+              label="所属区"
+              align="center"
+              width="120px"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="ename"
+              label="单位名称"
+              align="center"
+              width="280px"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="ecode"
+              align="center"
+              label="单位编码"
+              width="260px"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="account_bank"
+              align="center"
+              label="开户行"
+              width="220px"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="account_no"
+              align="center"
+              label="银行卡号"
+              width="360px"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="relocated_year"
+              align="center"
+              label="安置年度"
+              width="140px"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              label="操作"
+              width="200"
+              align="center"
+              fixed="right"
+            >
+              <template #default="{ row }">
+                <el-button
+                  plain
+                  @click="handleAdd(row)"
+                  type="primary"
+                  size="mini"
+                >
+                  编辑
+                </el-button>
+                <el-button
+                  plain
+                  @click="handleDelete(row)"
+                  type="danger"
+                  size="mini"
+                >
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-pagination
+            background
+            :current-page="queryForm.pageNo"
+            :page-size="queryForm.pageSize"
+            :layout="layout"
+            :total="total"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange2"
+          ></el-pagination>
+        </el-card>
+      </el-col>
+    </el-row>
+    <edit ref="edit" @fetch-data="fetchData"></edit>
+    <el-dialog title="异地安置配置" :visible.sync="dialogFormVisible">
+      <el-form :model="form">
+        <el-form-item label="是否开启" :label-width="formLabelWidth">
+          <el-radio v-model="form.isOpen" label="0">开启</el-radio>
+          <el-radio v-model="form.isOpen" label="1">关闭</el-radio>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="dialogFormVisible = false">取 消</el-button>
+        <el-button type="primary" @click="handleConfig()">确 定</el-button>
+      </div>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+  import {
+    delRelocatedInfo,
+    findRelocatedInfo,
+    relocatedConfig,
+    upRelocatedConfig,
+    yyExport,
+  } from '@/api_check/relocatedInfo'
+  import config from '../../../config/setting.config'
+  import Edit from './components/edit'
+  export default {
+    name: 'Index',
+    components: { Edit },
+    data() {
+      return {
+        value1: '',
+        checked: false,
+        isShow: false,
+        list: null,
+        listLoading: true,
+        layout: 'total, sizes, prev, pager, next, jumper',
+        total: 0,
+        selectRows: '',
+        elementLoadingText: '正在加载...',
+        isShow: false,
+        isOpen: true,
+        dialogFormVisible: false,
+        queryForm: {
+          administrative_unit: '',
+          pageNo: 1,
+          pageSize: 10,
+          empid: '',
+          num: '',
+          cardType: '',
+          name: '',
+          dCode: '',
+          usertype: '',
+          ecode: '',
+        },
+        form: {
+          isOpen: '0',
+        },
+        userinfo: {},
+        formLabelWidth: '120px',
+      }
+    },
+    created() {
+      var userinfo = JSON.parse(localStorage.getItem('userinfo'))
+      this.userinfo = userinfo
+      console.log(userinfo)
+      // this.queryForm.ecode = userinfo.org_code;
+      this.queryForm.empid = userinfo.id
+      if (userinfo.user_type == 1) {
+        this.isShow = true
+      } else {
+        this.queryForm.ecode = userinfo.org_code
+        this.queryForm.administrative_unit = userinfo.org_code
+      }
+      this.fetchData()
+      this.isConfig()
+    },
+    beforeDestroy() {},
+    mounted() {},
+    methods: {
+      handleExport() {
+        console.log(config)
+        var userinfo = JSON.parse(localStorage.getItem('userinfo'))
+        if (userinfo.id != 1) {
+          this.queryForm.uo_id = userinfo.org_code
+        }
+        this.$baseConfirm('你确定要导出当前信息吗', null, async () => {
+          this.listLoading = true
+          // const res = await yyExport(this.queryForm);
+          await yyExport(this.queryForm).then((res) => {
+            let fileName = '异地安置导出.xls'
+            let objectUrl = URL.createObjectURL(new Blob([res.data]))
+            const link = document.createElement('a')
+            link.download = decodeURI(fileName)
+            link.href = objectUrl
+            link.click()
+            this.listLoading = false
+            this.$baseMessage('导出成功！', 'success')
+          })
+        })
+      },
+      sex(row, index) {
+        if (row.sex == 1) {
+          return '男'
+        } else {
+          return '女'
+        }
+      },
+      setSelectRows(val) {
+        this.selectRows = val
+      },
+      handleCurrentChange(val) {
+        this.selectRows = val
+      },
+      openwin() {
+        this.$refs['cardnum'].showDia()
+      },
+      handleAdd(row) {
+        if (row.id) {
+          this.$refs['edit'].showDia(row)
+        } else {
+          this.$refs['edit'].showDia()
+        }
+      },
+      handleUser(row) {
+        this.$refs['usermana'].showDia(row.id)
+      },
+      handleSizeChange(val) {
+        this.queryForm.pageSize = val
+        this.fetchData()
+      },
+      handleCurrentChange2(val) {
+        this.queryForm.pageNo = val
+        this.fetchData()
+      },
+      handlechuli(row) {
+        this.$refs['views'].showDia(row.id)
+      },
+      handleDelete(row) {
+        if (row.id) {
+          this.$baseConfirm('你确定要删除当前项吗', null, async () => {
+            const { msg } = await delRelocatedInfo(row.id)
+            this.$baseMessage(msg, 'success')
+            this.fetchData()
+          })
+        } else {
+          if (this.selectRows != '' && this.selectRows != null) {
+            const ids = this.selectRows.map((item) => item.id).join()
+            this.$baseConfirm('你确定要删除选中项吗', null, async () => {
+              const { msg } = await delRelocatedInfo(ids)
+              this.$baseMessage(msg, 'success')
+              this.fetchData()
+            })
+          } else {
+            this.$baseMessage('未选中任何行', 'error')
+            return false
+          }
+        }
+      },
+      handleConfig() {
+        this.dialogFormVisible = false
+        this.listLoading = true
+        upRelocatedConfig(this.form)
+        setTimeout(() => {
+          this.listLoading = false
+        }, 300)
+      },
+      queryData() {
+        this.queryForm.pageNo = 1
+        this.fetchData()
+      },
+      moreQuery() {
+        this.isShow = !this.isShow
+      },
+      async fetchData() {
+        this.listLoading = true
+        const { data, totalCount } = await findRelocatedInfo(this.queryForm)
+        this.list = data.records
+        this.total = data.total
+        setTimeout(() => {
+          this.listLoading = false
+        }, 300)
+      },
+      async isConfig() {
+        this.listLoading = true
+        const { data } = await relocatedConfig()
+        this.form = data
+        if (data.isOpen == '1' && this.userinfo.user_type != 1) {
+          this.isOpen = false
+        } else {
+          this.isOpen = true
+        }
+        setTimeout(() => {
+          this.listLoading = false
+        }, 300)
+      },
+      async fetchDataFind() {
+        this.listLoading = true
+        const { data, totalCount } = await findRelocatedInfo(this.queryForm)
+        this.list = data.records
+        this.total = data.total
+        setTimeout(() => {
+          this.listLoading = false
+        }, 300)
+      },
+      async fetchData1() {
+        // this.queryForm.ecode = ''
+        // this.queryForm.empid = ''
+        this.queryForm.num = ''
+        this.queryForm.cardType = ''
+        this.queryForm.name = ''
+        this.queryForm.pageNo = 1
+        this.queryForm.pageSize = 10
+        this.listLoading = true
+        const { data, totalCount } = await findRelocatedInfo(this.queryForm)
+        this.list = data.records
+        this.total = data.total
+        setTimeout(() => {
+          this.listLoading = false
+        }, 300)
+      },
+    },
+  }
+</script>

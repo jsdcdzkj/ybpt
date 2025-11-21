@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport"
+          content="user-scalable=0,width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no,target-densitydpi=high-dpi"/>
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache">
+    <title>账号管理</title>
+    <meta name="keywords" content="账号管理"/>
+    <meta name="description" content="账号管理"/>
+    <link rel="stylesheet" href="fonts/iconfont.css">
+    <link rel="stylesheet" href="css/css.css">
+    <script src="js/jquery-1.10.2.min.js" type="text/javascript" charset="utf-8"></script>
+    <script src="js/main.js" type="text/javascript" charset="utf-8"></script>
+</head>
+<body>
+<div class="wrap userCenter">
+    <header class="header headerwhitebg">
+        <div class="topbar">
+            <span class="btn-left"><i class="iconfont icon-fanhui"></i></span>
+            <div class="words ellipsis">账号管理</div>
+        </div>
+    </header>
+    <div class="contWrap">
+        <section class="memberinfo sec_box">
+            <ul>
+
+                <li id="zhanghao" class="nosanj">
+                    <p>平台账号</p>
+                    <em><span>admin</span></em>
+                </li>
+                <li id="updpwd" class="nomr">
+                    <p>修改密码</p>
+                    <em><span></span></em>
+                </li>
+                <li id="department" class="nomr">
+                    <p>所属部门</p>
+                    <em><span></span></em>
+                </li>
+            </ul>
+        </section>
+    </div>
+    <!-- <a class="submit-btn-bg-white" id="exits" href="javascript:;"> <span>退出当前账号</span> </a> -->
+    <div class="bottom">
+        <div class="submit">退出当前账号</div>
+    </div>
+    <!-- <footer class="menu_bar block" id="footer">
+          <div id="home" class="menu-tab-item">
+             <span class="icon"><i class="iconfont icon-zhuye1"></i></span>
+             <span class="menu-tab-label">首页</span>
+          </div>
+          <div id="rebate" class="menu-tab-item">
+             <span class="icon"><i class="iconfont icon-tianjiashebei1"></i></span>
+             <span class="menu-tab-label">票据</span>
+          </div>
+          <div id="member" class="menu-tab-item on">
+             <span class="icon"><i class="iconfont icon-huiyuan1"></i></span>
+             <span class="menu-tab-label">我的</span>
+          </div>
+      </footer> -->
+</div>
+<script>
+    $(function () {
+        $('#updpwd').on('click', function () {
+            location.href = 'userpwdupd.html';
+        });
+
+        $('#department').on('click', function () {
+            location.href = 'department.html';
+        })
+    })
+</script>
+</body>
+</html>

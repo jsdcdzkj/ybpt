@@ -1,0 +1,335 @@
+package com.jsdc.ybpt.controller;
+
+import com.alibaba.fastjson.JSONObject;
+import com.jsdc.ybpt.model.FileInfo;
+import com.jsdc.ybpt.model.SysUser;
+import com.jsdc.ybpt.model_check.*;
+import com.jsdc.ybpt.service.*;
+import com.jsdc.ybpt.util.FastDfs.FastDfsParams;
+import com.jsdc.ybpt.util.FastDfs.FastDfsUtil;
+import com.jsdc.ybpt.util.IdCardNumberMethod;
+import com.jsdc.ybpt.util.StringUtils;
+import com.jsdc.ybpt.vo.EmpSubscribeRecordVo;
+import com.jsdc.ybpt.vo.PersonSubscribeRecordVo;
+import com.jsdc.ybpt.vo.ResultInfo;
+import lombok.RequiredArgsConstructor;
+import org.apache.http.entity.ContentType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import java.io.*;
+import java.util.*;
+
+/**
+ * @Author ：苹果
+ * @Description：
+ * @Date ：2022/5/26 16:21
+ * @Modified By：
+ */
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/personSubRecord")
+public class PersonSubRecordController {
+    private static final Logger log = LoggerFactory.getLogger(PersonSubRecordController.class);
+    @Value("${uploadPath}")
+    private String uploadPath;
+
+    @Value("${printPath}")
+    private String printPath;
+
+    private final PersonSubscribeRecordService personSubscribeRecordService;
+    private final EmpSubscribeRecordService empSubscribeRecordService;
+    private final CivilworkerInfoService civilworkerInfoService;
+    private final OrganizationInfoService organizationInfoService;
+
+    private final SysUserService sysUserService;
+
+    @Autowired
+    private FileInfoService fileInfoService;
+    @Autowired
+    private FastDfsUtil fastDfsUtil;
+
+    @GetMapping("findPersonSubscribeRecordOne")
+    public ResultInfo findPersonSubscribeRecordOne(String id) {
+        return this.personSubscribeRecordService.findPersonSubscribeRecordOne(id);
+    }
+
+    @PostMapping("findPersonSubscribeRecord")
+    public ResultInfo findPersonSubscribeRecord(String esid, String cname, String year, String oname, String pname, String sched, Integer pageNo, Integer pageSize) {
+        return this.personSubscribeRecordService.findPersonSubscribeRecord(esid, cname, year, oname, pname, sched, pageNo, pageSize);
+    }
+
+    @PostMapping("savePersonSubscribeRecord")
+    public ResultInfo savePersonSubscribeRecord(String eid, String cid, String year, String oid, String pid, String applyDate, String sched, String checkupTime,
+                                                String uploadTime) {
+        return this.personSubscribeRecordService.savePersonSubscribeRecord(eid, cid, year, oid, pid, applyDate, sched, checkupTime, uploadTime);
+    }
+
+    @PostMapping("updatePersonSubscribeRecord")
+    public ResultInfo updatePersonSubscribeRecord(String eid, String cid, String year, String oid, String pid, String applyDate, String sched, String checkupTime,
+                                                  String uploadTime, String id) {
+        return this.personSubscribeRecordService.updatePersonSubscribeRecord(eid, cid, year, oid, pid, applyDate, sched, checkupTime, uploadTime, id);
+    }
+
+    /**
+     * @Description: 根据记录id查询体检人员名单
+     * @param: [rid]
+     * @return: com.jsdc.ybpt.vo.ResultInfo
+     * @author: 苹果
+     * @date: 2022/5/30
+     * @time: 11:42
+     */
+    @PostMapping("findCiviWorkerByRid")
+    public ResultInfo findCiviWorkerByRid(String rid, String oid, String time, String code) {
+        return this.personSubscribeRecordService.findCiviWorkerByRid(rid, oid, time, code);
+    }
+
+
+    /**
+     * @Description: 根据套餐id查看体检项目
+     * @param: [pid]
+     * @return: com.jsdc.ybpt.vo.ResultInfo
+     * @author: 苹果
+     * @date: 2022/5/30
+     * @time: 18:15
+     */
+    @GetMapping("findItemToMealByPid")
+    public ResultInfo findItemToMealByPid(String pid) {
+        return this.personSubscribeRecordService.findItemToMealByPid(pid);
+    }
+
+    /**
+     * 体检机构确认
+     *
+     * @param id
+     * @return
+     */
+    @PostMapping("conformById")
+    public ResultInfo conformById(String id) {
+        return personSubscribeRecordService.conformById(id);
+    }
+
+    /**
+     * 医保确认结算
+     *
+     * @param id
+     * @return
+     */
+    @PostMapping("jsConfirm")
+    public ResultInfo JSConfirm(String id) {
+        SysUser user = sysUserService.getUser();
+        //判断是否是医保
+        if (!user.getUser_type().equals("1")){
+            return ResultInfo.error("只有市直单位可以点击结算");
+        }
+        return personSubscribeRecordService.jsConfirm(id);
+    }
+
+    @PostMapping("settlementMore")
+    public ResultInfo settlementMore(@RequestBody PersonSubscribeRecordVo personSubscribeRecordVo) {
+        SysUser user = sysUserService.getUser();
+        //判断是否是医保
+        if (!user.getUser_type().equals("1")){
+            return ResultInfo.error("只有市直单位可以结算");
+        }
+        return personSubscribeRecordService.settlementMore(personSubscribeRecordVo);
+    }
+
+
+    /**
+     * 体检机构上传体检报告
+     *
+     * @return
+     */
+
+
+    @RequestMapping("/upload")
+    @ResponseBody
+    public ResultInfo multipleCommentImageUpload(HttpServletRequest request, HttpServletResponse response, @RequestParam(value = "file", required = false) List<MultipartFile> files, @RequestParam(value = "id", required = false) String id) {
+        long s = System.currentTimeMillis();
+        response.setContentType("text/html;charset=utf-8");
+        SysUser sysUser = sysUserService.getUser();
+        for (MultipartFile file : files) {
+            String fileName = file.getOriginalFilename(); //获取文件名
+            int index = fileName.lastIndexOf(".");
+            String fileSuffix = fileName.substring(index);
+            String file_name = UUID.randomUUID().toString().replaceAll("-", "") + fileSuffix;
+            String file_path = personSubscribeRecordService.getResponsePaths(id).getData().toString();
+
+            try {
+                    //改造 上传文件到文件服务器上
+//                log.error("上传文件 " + file_path +"" +file_name); ;
+//                uploadFile(file.getBytes(), file_path, file_name);
+//                SysFile sysFile = new SysFile();
+//                Date time = new Date();
+//                sysFile.setCreateTime(time);
+//                sysFile.setCreateUser(sysUser.getOrg_code());
+//                sysFile.setOldFileName(fileName);
+//                sysFile.setNewFileName(file_name);
+//                sysFile.setAssociationId(id);
+//                sysFile.setIs_del("0");
+//                sysFile.setFilePath(file_path + "/" + file_name);
+//                sysFile.insert();
+//                System.out.println("上传文件id："+sysFile.getId()+"   /预约记录id："+id+"   /当前时间：" + time+"  /原文件名 OldFileName："+fileName);
+//
+
+                //改造 上传文件到文件服务器上
+                String path = file_path + "/" + file_name;
+
+                MultipartFile  multipartFile = new MockMultipartFile(path, path, ContentType.APPLICATION_OCTET_STREAM.toString(), file.getInputStream());
+                String fileServerPath = "uploadCivil" + file_path.replace("E:/upload", "");
+                log.info("fileServerPath == " + fileServerPath);
+                //params = new FastDfsParams(fileServerPath, multipartFile, "13", id);
+                //公务员体检专用 上传到文件服务器
+                FastDfsParams  params = personSubscribeRecordService.uploadCivilFileServer(fileServerPath, multipartFile, id);
+                params.setFileName(fileName);
+                ResultInfo resultInfo = fastDfsUtil.uploadFile(params);
+                FileInfo fileInfo = (FileInfo) resultInfo.getData();
+                if(null != fileInfo){
+                    log.info(id +"==fileInfo == " + JSONObject.toJSONString(fileInfo));
+                }
+                personSubscribeRecordService.updateUploadFile(id);
+
+            } catch (MaxUploadSizeExceededException e) {
+                return ResultInfo.error("文件大小不符合规范");
+            } catch (Exception e) {
+                return ResultInfo.error("上传体检报告异常，请重新上传");
+            }
+        }
+        long e = System.currentTimeMillis();
+        log.error("上传文件共消耗 " + (e-s) +" 毫秒") ;
+        return ResultInfo.success();
+    }
+
+    public static void uploadFile(byte[] file, String filePath, String fileName) throws Exception {
+        System.out.println("wenjianlujing=====" + (filePath + "/" + fileName));
+        long sTime  = System.currentTimeMillis();
+        File targetFile = new File(filePath);
+        if (!targetFile.exists()) {
+            targetFile.mkdirs();
+        }
+        OutputStream out = null;
+        try {
+             out = new BufferedOutputStream(new FileOutputStream(filePath + "/" + fileName));
+
+            out.write(file);
+            out.flush();
+            out.close();
+        }catch (Exception e){
+            if(null != out) {
+                out.close();
+            }
+        }finally {
+            if(null != out) {
+                out.close();
+            }
+        }
+        long eTime  = System.currentTimeMillis();
+
+        System.out.println("wenjiandaxiao====22222====" + (eTime - sTime));
+    }
+
+
+    /**
+     * 体检机构协助 预约
+     *
+     * @param vo
+     * @return
+     */
+    @PostMapping("/save")
+    @ResponseBody
+    public ResultInfo savePersonSubscribeRecord(@RequestBody EmpSubscribeRecordVo vo) {
+        //wids
+        CivilworkerInfo cVo = new CivilworkerInfo();
+        cVo.setCertno(vo.getCertno());
+        CivilworkerInfo civil = civilworkerInfoService.getCivilworkerInfoByCardNo(cVo);
+        if (null == civil || "".equals(civil.getId())) {
+            return ResultInfo.error("无预约资格");
+        }
+
+        //异地安置判断
+        boolean relocationYearFlag = civilworkerInfoService.isRelocationYear(civil,vo.getYear());
+        if(relocationYearFlag){
+            return ResultInfo.error("此公务员在"+vo.getYear()+"年度申请已申请异地安置");
+        }
+
+        //上级行政单位验证
+        EmployingInfo employingInfo = civilworkerInfoService.getEmployingInfo(civil);
+        if (com.jsdc.ybpt.util.StringUtils.isEmpty(employingInfo.getParentOrgCode())) {
+            return ResultInfo.error("您所在单位暂未开通体检权限");
+        }
+
+        OrganizationInfo org = organizationInfoService.getEntity(vo.getOrg_id());
+
+        if(!employingInfo.getParentOrgCode().equals(org.getOrg_code())){
+            return ResultInfo.error("公务员和体检机构不在同一统筹区");
+        }
+
+
+        if (StringUtils.isNotEmpty(vo.getYear())){
+            Calendar calendar=Calendar.getInstance();
+            calendar.setTime(new Date());
+            int i = calendar.get(Calendar.YEAR);
+            if (!(String.valueOf( i )).equals(vo.getYear())){
+                return ResultInfo.error("选择年份必须和当前年份一致");
+            }
+        }
+        if (null != org) {
+            vo.setOrg_name(org.getOrg_name());
+        }
+        ArrayList<String> wids = new ArrayList<>();
+        wids.add(civil.getCertno());
+        vo.setWids(wids);
+        vo.setUid(civil.getEmp_id());
+
+        PackInfo packInfo = empSubscribeRecordService.getPackInfo(vo);
+        if(null == packInfo){
+            return ResultInfo.error("查无此套餐");
+        }
+        String sexFromIdCard = IdCardNumberMethod.getSexFromIdCard(cVo.getCertno())+"";
+        if (sexFromIdCard.equals(packInfo.getGender())){
+            return ResultInfo.error("选择套餐性别和预约人不匹配");
+        }
+        return empSubscribeRecordService.saveEmpSubscribeRecordForCivilPersonally(vo);
+    }
+
+    @PostMapping("backOutByAdmin")
+    public ResultInfo backOutByAdmin(@RequestBody PersonSubscribeRecord psr) {
+        SysUser user = this.sysUserService.getUser();
+        if (!Objects.equals(user.getUsername(), "admin")) {
+            return ResultInfo.error("只有admin可以操作撤销");
+        }
+
+        PersonSubscribeRecord personSubscribeRecord = psr.selectById();
+
+//        if (!Objects.equals("0", personSubscribeRecord.getSched())) {
+        if (!("0".equals( personSubscribeRecord.getSched()) || "2".equals( personSubscribeRecord.getSched())))  {
+            return ResultInfo.error("该用户不是未体检状态，无法撤销");
+        }
+        return this.personSubscribeRecordService.backOutPersonSubscribeRecordByAdmin(personSubscribeRecord);
+    }
+
+
+    @PostMapping("backOut")
+    public ResultInfo backOut(@RequestBody PersonSubscribeRecord psr) {
+
+
+        PersonSubscribeRecord personSubscribeRecord = psr.selectById();
+
+//        if (!Objects.equals("0", personSubscribeRecord.getSched())) {
+        if (!("0".equals( personSubscribeRecord.getSched()) || "2".equals( personSubscribeRecord.getSched())))  {
+            return ResultInfo.error("该用户不是未体检状态，无法撤销");
+        }
+        return this.personSubscribeRecordService.backOutPersonSubscribeRecordByAdmin(personSubscribeRecord);
+    }
+
+}

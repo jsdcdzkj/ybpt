@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="ybpt-api" />
+        <module name="ybpt-gateway" />
+        <module name="ybpt-model" />
+        <module name="maven-archiver" />
+        <module name="fddServer" />
+        <module name="ybpt-web" />
+        <module name="ybpt-core" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="ybpt-physical_examination" target="1.8" />
+    </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="fddServer" options="-parameters" />
+      <module name="ybpt-api" options="-parameters" />
+      <module name="ybpt-core" options="-parameters" />
+      <module name="ybpt-gateway" options="-parameters" />
+      <module name="ybpt-model" options="-parameters" />
+      <module name="ybpt-physical_examination" options="-parameters" />
+      <module name="ybpt-web" options="-parameters" />
+    </option>
+  </component>
+</project>

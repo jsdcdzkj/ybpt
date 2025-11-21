@@ -1,0 +1,648 @@
+package com.jsdc.ybpt.service;
+
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.poi.excel.ExcelUtil;
+import cn.hutool.poi.excel.ExcelWriter;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.jsdc.ybpt.base.BaseService;
+import com.jsdc.ybpt.mapper.*;
+import com.jsdc.ybpt.model.SysUser;
+import com.jsdc.ybpt.model_check.*;
+import com.jsdc.ybpt.model_query.PersonInfo;
+import com.jsdc.ybpt.util.DateUtil;
+
+import com.jsdc.ybpt.util.IdCardNumberMethod;
+import com.jsdc.ybpt.vo.EmpExport;
+import com.jsdc.ybpt.vo.EmpSubscribeRecordVo;
+import com.jsdc.ybpt.vo.ResultInfo;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * @Author ：苹果
+ * @Description：单位预约记录表
+ * @Date ：2022/5/26 14:17
+ * @Modified By：
+ */
+@Service
+@RequiredArgsConstructor
+public class EmpSubscribeRecordService extends BaseService<EmpSubscribeRecord> {
+
+    private final EmpSubscribeRecordMapper empSubscribeRecordMapper;
+
+    private final OrgSubscribeRulesMapper orgSubscribeRulesMapper;
+
+    private final PackInfoMapper packInfoMapper;
+
+    private final CivilworkerRecordMapper civilworkerRecordMapper;
+
+    private final PhysExamConfigMapper physExamConfigMapper;
+
+    private final CivilworkerInfoMapper civilworkerInfoMapper;
+
+    private final PersonSubscribeRecordMapper personSubscribeRecordMapper;
+
+    private final AutonomousMedicalMapper autonomousMedicalMapper;
+
+    private final SysUserService sysUserService;
+
+    private final EmployingInfoMapper employingInfoMapper;
+    private final OrganizationInfoService organizationInfoService;
+    private final RelocatedInfoService relocatedInfoService;
+
+    public ResultInfo findEmpSubscribeRecordOne(String id) {
+        EmpSubscribeRecordVo vo = new EmpSubscribeRecordVo();
+        EmpSubscribeRecord empSubscribeRecord = this.empSubscribeRecordMapper.findEmpSubscribeRecordOne(id);
+        LambdaQueryWrapper<PersonSubscribeRecord> psrWrapper = new LambdaQueryWrapper<>();
+        psrWrapper.eq(PersonSubscribeRecord::getEmp_sub_id, empSubscribeRecord.getId());
+        List<PersonSubscribeRecord> psrList = this.personSubscribeRecordMapper.selectList(psrWrapper);
+        List<String> wid = new ArrayList<>();
+        for (PersonSubscribeRecord record : psrList) {
+            wid.add(record.getCivilworker_id());
+        }
+        vo.setWids(wid);
+        vo.setPid(empSubscribeRecord.getPack_id());
+        vo.setTime(psrList.get(0).getCheckup_time());
+        vo.setYear(empSubscribeRecord.getPack_year());
+        vo.setMoney(empSubscribeRecord.getMoney());
+        vo.setStart(empSubscribeRecord.getStart_time());
+        vo.setEnd(empSubscribeRecord.getEnd_time());
+        vo.setOrg_name(empSubscribeRecord.getOrg_name());
+        return ResultInfo.success(vo);
+    }
+
+    public ResultInfo findEmpSubscribeRecord(String time, String empName, String packName, Integer pageNo, Integer pageSize, String uoid) {
+        Page<EmpSubscribeRecord> page = new Page();
+        page.setCurrent(pageNo);
+        page.setSize(pageSize);
+        page.setRecords(this.empSubscribeRecordMapper.findEmpSubscribeRecord(time, empName, packName,
+                (pageNo - 1) * pageSize, pageNo * pageSize, uoid));
+        page.setTotal(this.empSubscribeRecordMapper.findEmpSubscribeRecordCount(time, empName, packName, uoid));
+        return ResultInfo.success(page);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED)
+    public synchronized ResultInfo saveEmpSubscribeRecord1(EmpSubscribeRecordVo vo) {
+        //体检规则
+        LambdaQueryWrapper<PhysExamConfig> pecWrapper = new LambdaQueryWrapper<>();
+        pecWrapper.eq(PhysExamConfig::getYear, vo.getYear()).eq(PhysExamConfig::getIs_del, "0");
+        PhysExamConfig physExamConfig = this.physExamConfigMapper.selectOne(pecWrapper);
+        //规则信息
+        LambdaQueryWrapper<OrgSubscribeRules> osrWrapper = new LambdaQueryWrapper<>();
+        osrWrapper.eq(OrgSubscribeRules::getIsbook, "1").eq(OrgSubscribeRules::getState, "0")
+                .in(OrgSubscribeRules::getTime, vo.getTimes());
+        List<OrgSubscribeRules> orgSubscribeRules = this.orgSubscribeRulesMapper.selectList(osrWrapper);
+        if (isPersonOver(vo, orgSubscribeRules)) {//判断选择的人数是否满足
+            Integer i = 0;//记录当前人员列表下标
+            for (OrgSubscribeRules orgSubscribeRule : orgSubscribeRules) {
+                if (isSubscribeRules(orgSubscribeRule) && i < vo.getWids().size()) {//是否在预约时间内，是否满员
+                    EmpSubscribeRecord empSubscribeRecord = new EmpSubscribeRecord();
+                    empSubscribeRecord.setUo_id(vo.getUid());
+                    empSubscribeRecord.setPack_id(vo.getPid());
+                    empSubscribeRecord.setCreate_time(DateUtil.getDateFormat(new Date(), DateUtil.FULL_SPLIT_PATTERN));
+                    empSubscribeRecord.setSubscribe_num(vo.getWids().size());
+                    empSubscribeRecord.setStart_time(vo.getStart());
+                    empSubscribeRecord.setEnd_time(vo.getEnd());
+                    empSubscribeRecord.setMoney(vo.getMoney());
+                    empSubscribeRecord.setOrg_name(vo.getOrg_name());
+                    empSubscribeRecord.setPack_year(vo.getYear());
+                    empSubscribeRecord.setIs_del("0");
+                    this.empSubscribeRecordMapper.insert(empSubscribeRecord);
+                    if (isPhysExamConfig(physExamConfig, vo, i)) {//人员预约次数是否超标
+                        Integer num = (Integer.parseInt(orgSubscribeRule.getLimit_person()) - Integer.parseInt(orgSubscribeRule.getBooking_person()));
+                        for (; i < vo.getWids().size(); ) {
+                            do {
+                                PersonSubscribeRecord record = new PersonSubscribeRecord();
+                                record.setApply_date(orgSubscribeRule.getTime());
+                                record.setCheckup_time(vo.getTime());
+                                record.setCivilworker_id(vo.getWids().get(i));
+                                record.setEmp_sub_id(empSubscribeRecord.getId());
+                                record.setYear(vo.getYear());
+                                record.setIs_del("0");
+                                record.setOrg_id(vo.getOrg_id());
+                                record.setPack_id(vo.getPid());
+                                record.setSched("0");
+                                Integer isSuc = personSubscribeRecordMapper.insert(record);
+                                if (isSuc > 0) {
+                                    i++;
+                                    num--;
+                                }
+                            } while (num > 0 && i < vo.getWids().size());
+                        }
+                        OrgSubscribeRules rules = new OrgSubscribeRules();
+                        rules.setId(orgSubscribeRule.getId());
+                        rules.setBooking_person(Integer.parseInt(orgSubscribeRule.getBooking_person()) + num + "");
+                        this.orgSubscribeRulesMapper.updateById(rules);
+                    }
+                } else {
+                    return ResultInfo.error("不符合预约规则");
+                }
+            }
+        } else {
+            return ResultInfo.error("体检名额不足");
+        }
+        return ResultInfo.success();
+    }
+
+    /**
+     * @Description: 预约撤销
+     * @param: [id]
+     * @return: com.jsdc.ybpt.vo.ResultInfo
+     * @author: 苹果
+     * @date: 2022/6/1
+     * @time: 14:48
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public ResultInfo backoutSubscribe(String id) {
+        EmpSubscribeRecord empSubscribeRecord = this.empSubscribeRecordMapper.findEmpSubscribeRecordOne(id);//获取预约记录对象
+        if (empSubscribeRecord == null) {
+            return ResultInfo.error("预约对象不存在");
+        }
+        LambdaQueryWrapper<PersonSubscribeRecord> wrapper=new LambdaQueryWrapper<>();
+        wrapper.ne(PersonSubscribeRecord::getSched,"0").eq(PersonSubscribeRecord::getEmp_sub_id,id).
+                eq(PersonSubscribeRecord::getIs_del,"0");
+        if (this.personSubscribeRecordMapper.selectCount(wrapper)>0){
+            return ResultInfo.error("已经有人体检，无法撤销。");
+        }
+        List<Map<String, Object>> maps = this.personSubscribeRecordMapper.findPersonNumEveDay(id);//查询每天预约的人数
+        for (Map<String, Object> map : maps) {
+            LambdaQueryWrapper<OrgSubscribeRules> osrWrapper = new LambdaQueryWrapper<>();
+            osrWrapper.eq(OrgSubscribeRules::getTime, map.get("DAY")).eq(OrgSubscribeRules::getOrg_id, map.get("ORG_ID"));
+            OrgSubscribeRules orgSubscribeRules = this.orgSubscribeRulesMapper.selectOne(osrWrapper);//查询机构某时间预约的人数
+           if (Integer.parseInt(orgSubscribeRules.getBooking_person()) - Integer.parseInt(map.get("NUM").toString())>0){
+               orgSubscribeRules.setBooking_person(Integer.parseInt(orgSubscribeRules.getBooking_person()) - Integer.parseInt(map.get("NUM").toString()) + "");
+           }else{
+               orgSubscribeRules.setBooking_person("0");
+           }
+            this.orgSubscribeRulesMapper.updateById(orgSubscribeRules);//返还当天人数
+            LambdaQueryWrapper<PersonSubscribeRecord> psrWrapper = new LambdaQueryWrapper<>();
+            psrWrapper.eq(PersonSubscribeRecord::getEmp_sub_id, id);
+            PersonSubscribeRecord record = new PersonSubscribeRecord();
+            record.setIs_del("1");//删除撤销
+            record.setSched("4");
+            this.personSubscribeRecordMapper.update(record, psrWrapper);
+//                CivilworkerRecord civilworkerRecord = new CivilworkerRecord();
+//                civilworkerRecord.setCheck_flag("3");
+//                civilworkerRecord.setCivilworker_id(personSubscribeRecord.getCivilworker_id());
+//                civilworkerRecord.setYear(personSubscribeRecord.getYear());
+//                this.civilworkerRecordMapper.insert(civilworkerRecord);
+        }
+
+        empSubscribeRecord.setIs_del("1");
+        this.empSubscribeRecordMapper.updateById(empSubscribeRecord);
+        return ResultInfo.success("撤销成功");
+    }
+
+    public ResultInfo findCivilworkerNotIn(String id, String year, String name,String type,Integer index,Integer size) {
+        PhysExamConfig physExamConfig = null;
+        if (!StringUtils.isEmpty(year)) {
+            LambdaQueryWrapper<PhysExamConfig> wrapper = new LambdaQueryWrapper();
+            wrapper.eq(PhysExamConfig::getYear, year).eq(PhysExamConfig::getIs_del, "0");
+            physExamConfig = this.physExamConfigMapper.selectOne(wrapper);
+        }
+        List<CivilworkerInfo> civilworkerInfos = this.personSubscribeRecordMapper.findSubCid(id, year, name,
+                StringUtils.isEmpty(physExamConfig) ? null : physExamConfig.getExamination_num() + "");
+
+        List<PersonInfo> returnYiDiList = new ArrayList<>();
+        List<CivilworkerInfo> returnList = new ArrayList<>();
+        //异地安置体检年度判断
+        Set<String> civilworkerCertNos =relocatedInfoService.findCivilworkerByRelocatedYear(year);
+        List<String> certnos = civilworkerInfos.stream().map(CivilworkerInfo::getCertno).collect(Collectors.toList());
+        List<PersonInfo> personList = this.relocatedInfoService.findPersonList(certnos);
+        for (int i = 0; i < personList.size(); i++) {
+//            PersonInfo personInfo = new PersonInfo();
+//            personInfo.setRetr_type("914");
+            //如果存在说明此公务异地安置了
+            if(!civilworkerCertNos.contains(personList.get(i).getCertno())){
+                returnYiDiList.add(personList.get(i));
+                }
+            }
+        for (CivilworkerInfo civilworkerInfo : civilworkerInfos) {
+            for (PersonInfo personInfo : returnYiDiList) {
+                if (personInfo.getCertno().equals(civilworkerInfo.getCertno())){
+                    if ("0".equals(type)){//全部
+                        returnList.add(civilworkerInfo);
+                    }else if ("1".equals(type)){//退休
+                        if("1".equals(personInfo.getRetr_type_code())||"2".equals(personInfo.getRetr_type_code())||
+                                "3".equals(personInfo.getRetr_type_code())||"4".equals(personInfo.getRetr_type_code())||
+                                "5".equals(personInfo.getRetr_type_code())||"6".equals(personInfo.getRetr_type_code())||
+                                "7".equals(personInfo.getRetr_type_code())||"8".equals(personInfo.getRetr_type_code())||
+                                "9".equals(personInfo.getRetr_type_code())||"99".equals(personInfo.getRetr_type_code())){
+                            returnList.add(civilworkerInfo);
+                        }
+                    }else {//在职
+                        if("914".equals(personInfo.getRetr_type_code())){
+                            returnList.add(civilworkerInfo);
+                        }
+                    }
+                }
+            }
+        }
+        System.out.println("==2=3=="+returnList.size());
+        return ResultInfo.success(returnList);
+    }
+
+    public ResultInfo findCivilworkerIn(String id, String year, String name,Integer index,Integer size) {
+        PhysExamConfig physExamConfig = null;
+        if (!StringUtils.isEmpty(year)) {
+            LambdaQueryWrapper<PhysExamConfig> wrapper = new LambdaQueryWrapper();
+            wrapper.eq(PhysExamConfig::getYear, year).eq(PhysExamConfig::getIs_del, "0");
+            physExamConfig = this.physExamConfigMapper.selectOne(wrapper);
+        }
+        List<CivilworkerInfo> civilworkerInfos =this.personSubscribeRecordMapper.findSubCidOver(id, year, name,
+                StringUtils.isEmpty(physExamConfig) ? null : physExamConfig.getExamination_num() + "");
+        return ResultInfo.success(civilworkerInfos);
+    }
+
+    /***
+     * @Description: 验证某天是否可以预约
+     * @param: [osr, vo]
+     * @return: boolean
+     * @author: 苹果
+     * @date: 2022/5/31
+     * @time: 14:28
+     */
+    private boolean isSubscribeRules(OrgSubscribeRules osr) {
+        if (StringUtils.isEmpty(osr)) {
+            return false;
+        } else {
+            if ((Integer.parseInt(osr.getLimit_person()) - Integer.parseInt(osr.getBooking_person())) == 0) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+    }
+
+    /**
+     * @Description: 验证某一个人是否有资格申请体检
+     * @param: [physExamConfig, vo, num, i]
+     * @return: boolean
+     * @author: 苹果
+     * @date: 2022/5/31
+     * @time: 14:38
+     */
+    private boolean isPhysExamConfig(PhysExamConfig physExamConfig, EmpSubscribeRecordVo vo, Integer i) {
+        LambdaQueryWrapper<CivilworkerRecord> crWrapper = new LambdaQueryWrapper<>();
+        crWrapper.eq(CivilworkerRecord::getYear, vo.getYear()).eq(CivilworkerRecord::getCheck_flag, "1").
+                eq(CivilworkerRecord::getCivilworker_id, vo.getWids().get(i));
+        long time = this.civilworkerRecordMapper.selectCount(crWrapper);
+        if (time >= physExamConfig.getExamination_num()) {//预约次数超标
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    private boolean isPersonOver(EmpSubscribeRecordVo vo, List<OrgSubscribeRules> orgSubscribeRules) {
+        Integer num = 0;
+        for (OrgSubscribeRules orgSubscribeRule : orgSubscribeRules) {
+            num += (Integer.parseInt(orgSubscribeRule.getLimit_person()) - Integer.parseInt(orgSubscribeRule.getBooking_person()));
+        }
+        if (vo.getWids().size() <= num) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * @param vo
+     * @return
+     * @Description: 公务员端 个人申请预约记录
+     * @author: yc
+     * @date: 2022/6/7
+     * @time: 16:47
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public synchronized ResultInfo saveEmpSubscribeRecordForCivilPersonally(EmpSubscribeRecordVo vo) {
+        // 1.查询个人预约记录，如果在该年已经提交，则不允许再次提交
+        // 2.公务员个人信息, 如计数为小于等于0, 则没有资格参加预约
+        // 3.是否满足机构预约规则,如果改日没有记录或者人数已满，则不能提交
+        // 4.套餐信息是否已下架
+        // 5.该日预约记录人数+1
+
+        // 1.查询个人预约记录，如果在该年已经提交，则不允许再次提交
+
+        // 4.套餐信息是否已下架
+        LambdaQueryWrapper<PackInfo> piWrapper = new LambdaQueryWrapper<>();
+        piWrapper.eq(PackInfo::getId, vo.getPid());
+        piWrapper.eq(PackInfo::getIs_del, "0");
+        piWrapper.eq(PackInfo::getIf_open, "1");
+        piWrapper.eq(PackInfo::getIf_use, "1");
+        PackInfo packInfo = this.packInfoMapper.selectOne(piWrapper);
+
+        if (packInfo == null) {
+            return ResultInfo.error("套餐可能已下架");
+        }
+
+        String sexFromIdCard = IdCardNumberMethod.getSexFromIdCard(vo.getCardId())+"";
+        if (sexFromIdCard.equals(packInfo.getGender())){
+            return ResultInfo.error("选择套餐性别和预约人不匹配");
+        }
+
+        if ("1".equals(packInfo.getPack_source())) {
+            if (!Objects.equals(packInfo.getOrg_id(), vo.getOrg_id())) {
+                return ResultInfo.error("所选套餐不属于"+vo.getOrg_name()+"请重新选择");
+            }
+        }
+
+        // 3.是否满足机构预约规则,如果该日没有记录或者人数已满，则不能提交
+        LambdaQueryWrapper<OrgSubscribeRules> orgSubscribeRulesQuery = new LambdaQueryWrapper<>();
+        orgSubscribeRulesQuery.eq(OrgSubscribeRules::getTime, vo.getApply_date())
+                .eq(OrgSubscribeRules::getIsbook, "1")
+                .eq(OrgSubscribeRules::getState, "0")
+                .eq(OrgSubscribeRules::getOrg_id, vo.getOrg_id());
+        OrgSubscribeRules orgSubscribeRules = this.orgSubscribeRulesMapper.selectOne(orgSubscribeRulesQuery);
+        if (orgSubscribeRules == null) {
+            return ResultInfo.error("在" + vo.getApply_date() + "没有机构体检规则");
+        }
+        if ((Integer.parseInt(orgSubscribeRules.getLimit_person()) - Integer.parseInt(orgSubscribeRules.getBooking_person()) <= 0)) {
+            return ResultInfo.error("该日该机构预约次数已满");
+        }
+
+        int bookingPerson = Integer.parseInt(orgSubscribeRules.getBooking_person());
+        int limitPerson = Integer.parseInt(orgSubscribeRules.getLimit_person());
+        if (limitPerson > bookingPerson) {
+            orgSubscribeRules.setBooking_person(String.valueOf(++bookingPerson));
+            orgSubscribeRules.updateById();
+        } else {
+            return ResultInfo.error("超出预约人数");
+        }
+
+
+        if(!packInfo.getPack_year().equals(vo.getYear())){
+            System.out.println(packInfo.getId() +"已选套餐("+packInfo.getPack_name()+")和套餐年份不匹配"+ vo.getYear());
+            return ResultInfo.error("已选套餐("+packInfo.getPack_name()+")和套餐年份不匹配, 请重新选择");
+        }
+
+
+
+        Date nowDate = new Date();
+        EmpSubscribeRecord empSubscribeRecord = new EmpSubscribeRecord();
+        empSubscribeRecord.setUo_id(vo.getUid());
+        empSubscribeRecord.setPack_id(vo.getPid());
+        empSubscribeRecord.setCreate_time(DateUtil.getDateFormat(nowDate, DateUtil.FULL_TIME_SPLIT_PATTERN));
+        empSubscribeRecord.setSubscribe_num(1);
+        empSubscribeRecord.setStart_time(vo.getStart());
+        empSubscribeRecord.setEnd_time(vo.getEnd());
+        empSubscribeRecord.setMoney(packInfo.getPack_money());
+        empSubscribeRecord.setOrg_name(vo.getOrg_name());
+//        empSubscribeRecord.setPack_year(vo.getYear());
+        empSubscribeRecord.setPack_year(packInfo.getPack_year());
+        empSubscribeRecord.setIs_personal("1");
+        empSubscribeRecord.setIs_del("0");
+        this.empSubscribeRecordMapper.insert(empSubscribeRecord);
+
+        PersonSubscribeRecord record = new PersonSubscribeRecord();
+        record.setApply_date(orgSubscribeRules.getTime());
+//        record.setCheckup_time(vo.getTime());   // 由体检机构填，这里不填
+        record.setCivilworker_id(vo.getCardId());
+        record.setEmp_sub_id(empSubscribeRecord.getId());
+//        record.setYear(vo.getYear());
+        record.setYear(packInfo.getPack_year());
+        record.setCardType(vo.getCardType());
+        record.setIs_del("0");
+        record.setOrg_id(vo.getOrg_id());
+        record.setPack_id(vo.getPid());
+        record.setSched("0");
+        record.setPhone(vo.getPhone());
+        record.setCreateTime(nowDate);
+        personSubscribeRecordMapper.insert(record);
+        return ResultInfo.success();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED)
+    public synchronized ResultInfo saveEmpSubscribeRecord(EmpSubscribeRecordVo vo) {
+        Integer count=this.autonomousMedicalMapper.findAutonomousMedicalCount(vo.getUid());
+        if (count > 0) {
+            return ResultInfo.error("单位已经申请了自主体检！");
+        }
+        LambdaQueryWrapper<PhysExamConfig> physWrapper=new LambdaQueryWrapper<>();
+        physWrapper.eq(PhysExamConfig::getYear,vo.getYear()).eq(PhysExamConfig::getIs_del,"0");
+        PhysExamConfig physExamConfig=this.physExamConfigMapper.selectOne(physWrapper);
+        if (StringUtils.isEmpty(physExamConfig)){
+            return ResultInfo.error("当年没有设置体检标准！");
+        }
+        LambdaQueryWrapper<EmployingInfo> employingInfoLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        employingInfoLambdaQueryWrapper.eq(EmployingInfo::getEmp_no,vo.getUid()).eq(EmployingInfo::getIs_del,"0");
+        EmployingInfo employingInfo=this.employingInfoMapper.selectOne(employingInfoLambdaQueryWrapper);
+        if (StringUtils.isEmpty(employingInfo.getParentOrgCode())){
+            return ResultInfo.error("本地区没有开通权限！");
+        }
+
+        OrganizationInfo organizationInfo = organizationInfoService.getEntityByOrgMedicalInsuranceNum(vo.getOrg_id());
+        if(!employingInfo.getParentOrgCode().equals(organizationInfo.getOrg_code())){
+            return ResultInfo.error("公务员和体检机构不在同一统筹区");
+        }
+
+        LambdaQueryWrapper<OrgSubscribeRules> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OrgSubscribeRules::getIsbook, "1").eq(OrgSubscribeRules::getState, "0").
+                eq(OrgSubscribeRules::getTime, vo.getTimes().get(0)).eq(OrgSubscribeRules::getOrg_id, vo.getOrg_id());
+        OrgSubscribeRules rules = this.orgSubscribeRulesMapper.selectOne(wrapper);
+        if (Integer.parseInt(rules.getBooking_person()) == Integer.parseInt(rules.getLimit_person())) {
+            return ResultInfo.error("人数已满请，刷新后重新操作！");
+        }
+        if (com.jsdc.ybpt.util.StringUtils.isNotEmpty(vo.getYear())){
+            Calendar calendar=Calendar.getInstance();
+            calendar.setTime(new Date());
+            int i = calendar.get(Calendar.YEAR);
+            if (!(String.valueOf( i )).equals(vo.getYear())){
+                return ResultInfo.error("选择年份必须和当前年份一致");
+            }
+        }
+
+        //fix bug 获取已上架和审批通过的套餐
+        LambdaQueryWrapper<PackInfo> packInfoWrapper = new LambdaQueryWrapper<>();
+        packInfoWrapper.eq(PackInfo::getId,vo.getPid());
+        packInfoWrapper.eq(PackInfo::getIf_open,1);
+        packInfoWrapper.eq(PackInfo::getStatus,1);
+        PackInfo dbPackInfo = packInfoMapper.selectOne(packInfoWrapper);
+        if(!vo.getYear().equals(dbPackInfo.getPack_year())){
+            System.out.println(dbPackInfo.getId() +"已选套餐("+dbPackInfo.getPack_name()+")和套餐年份不匹配"+ vo.getYear());
+            return ResultInfo.error("已选套餐("+dbPackInfo.getPack_name()+")和套餐年份不匹配");
+        }
+
+        if (dbPackInfo == null) {
+            return ResultInfo.error("套餐可能已下架");
+        }
+
+
+        if ("1".equals(dbPackInfo.getPack_source())) {
+            if (!Objects.equals(dbPackInfo.getOrg_id(), vo.getOrg_id())) {
+                return ResultInfo.error("所选套餐不属于"+vo.getOrg_name()+"请重新选择");
+            }
+        }
+//        LambdaQueryWrapper<EmpSubscribeRecord> queryWrapper=new LambdaQueryWrapper<>();
+//        queryWrapper.eq(EmpSubscribeRecord::getIs_del,0).eq(EmpSubscribeRecord::getPack_year,vo.getYear());
+//        List<EmpSubscribeRecord> SubscribeRecords=list(queryWrapper);
+//        if (physExamConfig.getExamination_num()<SubscribeRecords.size()){
+//            return ResultInfo.error("超出可用预约次数,请检查预约记录！");
+//        }
+
+        EmpSubscribeRecord empSubscribeRecord = new EmpSubscribeRecord();
+        empSubscribeRecord.setUo_id(vo.getUid());
+        empSubscribeRecord.setPack_id(vo.getPid());
+        empSubscribeRecord.setCreate_time(DateUtil.getDateFormat(new Date(), DateUtil.FULL_TIME_SPLIT_PATTERN));
+        empSubscribeRecord.setSubscribe_num(vo.getWids().size());
+        empSubscribeRecord.setStart_time(vo.getTimes().get(0));
+        empSubscribeRecord.setEnd_time(vo.getTimes().get(0));
+        empSubscribeRecord.setMoney(vo.getMoney());
+        empSubscribeRecord.setOrg_name(vo.getOrg_name());
+        empSubscribeRecord.setPack_year(vo.getYear());
+        empSubscribeRecord.setIs_del("0");
+        empSubscribeRecord.setIs_personal("0");
+        empSubscribeRecord.setSub_org(vo.getOrg_id());
+        if (StringUtils.isEmpty(vo.getId())) {
+            this.empSubscribeRecordMapper.insert(empSubscribeRecord);
+        } else {
+            empSubscribeRecord.setId(vo.getId());
+        }
+        if (vo.getWids().size() >= vo.getNum()) {
+            for (int i = 0; i < vo.getNum(); i++) {
+                LambdaQueryWrapper<OrgSubscribeRules> rwrapper = new LambdaQueryWrapper<>();
+                rwrapper.eq(OrgSubscribeRules::getIsbook, "1").eq(OrgSubscribeRules::getState, "0").
+                        eq(OrgSubscribeRules::getTime, vo.getTimes().get(0)).eq(OrgSubscribeRules::getOrg_id, vo.getOrg_id());
+                OrgSubscribeRules rules1 = this.orgSubscribeRulesMapper.selectOne(rwrapper);
+                if (Integer.parseInt(rules1.getBooking_person()) == Integer.parseInt(rules1.getLimit_person())) {
+                    return ResultInfo.error("人数已满请，刷新后重新操作！");
+                }
+                LambdaQueryWrapper<PersonSubscribeRecord> wrapper2=new LambdaQueryWrapper<>();
+                wrapper2.eq(PersonSubscribeRecord::getYear,vo.getYear()).eq(PersonSubscribeRecord::getIs_del,"0").
+                        eq(PersonSubscribeRecord::getCivilworker_id,vo.getWids().get(i));
+                Long num1=this.personSubscribeRecordMapper.selectCount(wrapper2);
+                if (num1 >= physExamConfig.getExamination_num()) {
+                   continue;
+                }
+                PersonSubscribeRecord record = new PersonSubscribeRecord();
+                record.setApply_date(vo.getTimes().get(0));
+                record.setCivilworker_id(vo.getWids().get(i));
+                record.setEmp_sub_id(empSubscribeRecord.getId());
+                record.setCreateTime(new Date());
+                record.setYear(vo.getYear());
+                record.setIs_del("0");
+                record.setCardType("1");
+                record.setChargePhone(vo.getPhone());
+                record.setOrg_id(vo.getOrg_id());
+                record.setPack_id(vo.getPid());
+                record.setSched("0");
+                personSubscribeRecordMapper.insert(record);
+                rules1.setBooking_person(Integer.parseInt(rules1.getBooking_person()) + 1 + "");
+                this.orgSubscribeRulesMapper.updateById(rules1);
+            }
+            if (com.jsdc.ybpt.util.StringUtils.isNotEmpty(vo.getId())) {
+                EmpSubscribeRecord record = this.empSubscribeRecordMapper.selectById(vo.getId());
+                record.setSubscribe_num(empSubscribeRecord.getSubscribe_num() + record.getSubscribe_num());
+                this.empSubscribeRecordMapper.updateById(record);
+            }
+        } else {
+            for (int i = 0; i < vo.getWids().size(); i++) {
+                LambdaQueryWrapper<OrgSubscribeRules> rwrapper = new LambdaQueryWrapper<>();
+                rwrapper.eq(OrgSubscribeRules::getIsbook, "1").eq(OrgSubscribeRules::getState, "0").
+                        eq(OrgSubscribeRules::getTime, vo.getTimes().get(0)).eq(OrgSubscribeRules::getOrg_id, vo.getOrg_id());
+                OrgSubscribeRules rules1 = this.orgSubscribeRulesMapper.selectOne(rwrapper);
+                if (Integer.parseInt(rules1.getBooking_person()) == Integer.parseInt(rules1.getLimit_person())) {
+                    return ResultInfo.error("人数已满请，刷新后重新操作！");
+                }
+                LambdaQueryWrapper<PersonSubscribeRecord> wrapper2=new LambdaQueryWrapper<>();
+                wrapper2.eq(PersonSubscribeRecord::getYear,vo.getYear()).eq(PersonSubscribeRecord::getIs_del,"0").
+                        eq(PersonSubscribeRecord::getCivilworker_id,vo.getWids().get(i));
+                Long num1=this.personSubscribeRecordMapper.selectCount(wrapper2);
+                if (num1 >= physExamConfig.getExamination_num()) {
+                    continue;
+                }
+                PersonSubscribeRecord record = new PersonSubscribeRecord();
+                record.setApply_date(vo.getTimes().get(0));
+                record.setCivilworker_id(com.jsdc.ybpt.util.StringUtils.trim(vo.getWids().get(i)));
+                record.setEmp_sub_id(empSubscribeRecord.getId());
+                record.setYear(vo.getYear());
+                record.setIs_del("0");
+                record.setOrg_id(vo.getOrg_id());
+                record.setChargePhone(vo.getPhone());
+                record.setPack_id(vo.getPid());
+                record.setSched("0");
+                personSubscribeRecordMapper.insert(record);
+                rules1.setBooking_person(Integer.parseInt(rules1.getBooking_person()) +  1 + "");
+                this.orgSubscribeRulesMapper.updateById(rules1);
+            }
+            if (com.jsdc.ybpt.util.StringUtils.isNotEmpty(vo.getId())) {
+                EmpSubscribeRecord record = this.empSubscribeRecordMapper.selectById(vo.getId());
+                record.setSubscribe_num(empSubscribeRecord.getSubscribe_num() + record.getSubscribe_num());
+                this.empSubscribeRecordMapper.updateById(record);
+            }
+        }
+        return ResultInfo.success();
+    }
+
+
+    public void export(String time, String empName, String packName, Integer pageNo, Integer pageSize, String uoid, HttpServletResponse response) throws IOException {
+//        ExcelKit.$Export(EmpExport.class, response)
+//                .downXlsx(this.empSubscribeRecordMapper.findEmpSubscribeRecordExport(time,empName, packName, pageNo, pageSize, uoid), false);
+        SysUser sysUser=this.sysUserService.getUser();
+        List<EmpExport> record;
+        if("4".equals(sysUser.getUser_type())){
+           record=this.empSubscribeRecordMapper.findEmpSubscribeRecordExport(time, empName, packName, 0, 10000, uoid);
+        }else {
+            record=this.empSubscribeRecordMapper.findEmpSubscribeRecordExport(time, empName, packName, 0, 10000, null);
+        }
+        for (EmpExport empExport : record) {
+            if ("0".equals(empExport.getIs_personal())){
+                empExport.setIs_personal("单位");
+            }else{
+                empExport.setIs_personal("个人");
+            }
+        }
+        // 通过工具类创建writer，默认创建xls格式
+        ExcelWriter writer = ExcelUtil.getWriter();
+        //自定义标题别名
+        writer.addHeaderAlias("year", "套餐年份");
+        writer.addHeaderAlias("pack_name", "套餐类型");
+        writer.addHeaderAlias("oname", "体检机构");
+        writer.addHeaderAlias("start_time", "预约时间");
+        writer.addHeaderAlias("is_personal", "预约方式");
+
+// 默认的，未添加alias的属性也会写出，如果想只写出加了别名的字段，可以调用此方法排除之
+        writer.setOnlyAlias(true);
+
+// 合并单元格后的标题行，使用默认标题样式
+        writer.merge(4, "线上批量预约");
+// 一次性写出内容，使用默认样式，强制输出标题
+           writer.write(record, true);
+//out为OutputStream，需要写出到的目标流
+
+//response为HttpServletResponse对象
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8");
+//test.xls是弹出下载对话框的文件名，不能为中文，中文请自行编码
+        response.setHeader("Content-Disposition", "attachment;filename=SubInfo.xlsx");
+        ServletOutputStream out = response.getOutputStream();
+
+        writer.flush(out, true);
+// 关闭writer，释放内存
+        writer.close();
+//此处记得关闭输出Servlet流
+        IoUtil.close(out);
+    }
+
+    public PackInfo getPackInfo(EmpSubscribeRecordVo vo){
+        LambdaQueryWrapper<PackInfo> piWrapper = new LambdaQueryWrapper<>();
+        piWrapper.eq(PackInfo::getId, vo.getPid());
+        piWrapper.eq(PackInfo::getPack_year, vo.getYear());
+        piWrapper.eq(PackInfo::getIs_del, "0");
+        piWrapper.eq(PackInfo::getIf_open, "1");
+        piWrapper.eq(PackInfo::getIf_use, "1");
+        PackInfo packInfo = this.packInfoMapper.selectOne(piWrapper);
+        return packInfo ;
+    }
+}

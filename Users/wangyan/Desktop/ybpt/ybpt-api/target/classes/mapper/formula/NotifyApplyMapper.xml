@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jsdc.ybpt.mapper.formula.NotifyApplyMapper">
+
+    <select id="selectDataList" resultType="com.jsdc.ybpt.formula.domain.entity.NotifyApply">
+        select
+            t1.ID,
+            t1.IS_IN_CATEGORY,
+            t1.CATEGORY_ID,
+            t1.NATIONAL_FORMULA_CODE,
+            t1.FORMULA_NAME,
+            t1.APPROVAL_NO,
+            t1.REGISTER_COMPANY_NAME,
+            t1.DOSAGE_FORM,
+            t1.SPECS,
+            t1.UNIT,
+            t1.PRICE,
+            t1.LOCAL_PM_PRICE,
+            t1.IS_DEL,
+            t1.CREATETIME,
+            t1.CREATEUSER,
+            t1.UPDATETIME,
+            t1.UPDATEUSER,
+            t1.STATUS,
+            t1.REJECT_REASON,
+            t1.REJECT_TIME,
+            t1.REJECT_USER,
+            t1.FIRST_CHECK_TIME,
+            t1.FIRST_CHECK_USER,
+            t1.SECOND_CHECK_TIME,
+            t1.SECOND_CHECK_USER,
+            t1.FINISH_CHECK_TIME,
+            t1.FINISH_CHECK_USER,
+            t1.GENERAL_ACCEPT_LETTER_TIME
+
+        from FORMULA_NOTIFY_APPLY t1
+        <where>
+      
+            <if test="id != null and id != ''">
+                and t1.ID = #{id}
+            </if>
+            <if test="isInCategory != null and isInCategory != ''">
+                and t1.IS_IN_CATEGORY = #{isInCategory}
+            </if>
+            <if test="categoryId != null and categoryId != ''">
+                and t1.CATEGORY_ID = #{categoryId}
+            </if>
+            <if test="nationalFormulaCode != null and nationalFormulaCode != ''">
+                and t1.NATIONAL_FORMULA_CODE = #{nationalFormulaCode}
+            </if>
+            <if test="formulaName != null and formulaName != ''">
+                and t1.FORMULA_NAME = #{formulaName}
+            </if>
+            <if test="approvalNo != null and approvalNo != ''">
+                and t1.APPROVAL_NO = #{approvalNo}
+            </if>
+            <if test="registerCompanyName != null and registerCompanyName != ''">
+                and t1.REGISTER_COMPANY_NAME = #{registerCompanyName}
+            </if>
+            <if test="dosageForm != null and dosageForm != ''">
+                and t1.DOSAGE_FORM = #{dosageForm}
+            </if>
+            <if test="specs != null and specs != ''">
+                and t1.SPECS = #{specs}
+            </if>
+            <if test="unit != null and unit != ''">
+                and t1.UNIT = #{unit}
+            </if>
+            <if test="price != null">
+                and t1.PRICE = #{price}
+            </if>
+            <if test="localPmPrice != null">
+                and t1.LOCAL_PM_PRICE = #{localPmPrice}
+            </if>
+            <if test="isDel != null and isDel != ''">
+                and t1.IS_DEL = #{isDel}
+            </if>
+            <if test="createtime != null">
+                and t1.CREATETIME = #{createtime}
+            </if>
+            <if test="createuser != null and createuser != ''">
+                and t1.CREATEUSER = #{createuser}
+            </if>
+            <if test="updatetime != null">
+                and t1.UPDATETIME = #{updatetime}
+            </if>
+            <if test="updateuser != null and updateuser != ''">
+                and t1.UPDATEUSER = #{updateuser}
+            </if>
+            <if test="status != null and status != ''">
+                and t1.STATUS = #{status}
+            </if>
+            <if test="rejectReason != null">
+                and t1.REJECT_REASON = #{rejectReason}
+            </if>
+            <if test="rejectTime != null">
+                and t1.REJECT_TIME = #{rejectTime}
+            </if>
+            <if test="rejectUser != null">
+                and t1.REJECT_USER = #{rejectUser}
+            </if>
+            <if test="firstCheckTime != null">
+                and t1.FIRST_CHECK_TIME = #{firstCheckTime}
+            </if>
+            <if test="firstCheckUser != null">
+                and t1.FIRST_CHECK_USER = #{firstCheckUser}
+            </if>
+            <if test="secondCheckTime != null">
+                and t1.SECOND_CHECK_TIME = #{secondCheckTime}
+            </if>
+            <if test="secondCheckUser != null">
+                and t1.SECOND_CHECK_USER = #{secondCheckUser}
+            </if>
+            <if test="finishCheckTime != null">
+                and t1.FINISH_CHECK_TIME = #{finishCheckTime}
+            </if>
+            <if test="finishCheckUser != null">
+                and t1.FINISH_CHECK_USER = #{finishCheckUser}
+            </if>
+            <if test="generalAcceptLetterTime != null">
+                and t1.GENERAL_ACCEPT_LETTER_TIME = #{generalAcceptLetterTime}
+            </if>
+        </where>
+    </select>
+    
+    
+    <select id="pageByDTO" resultType="com.jsdc.ybpt.formula.domain.entity.NotifyApply"
+        parameterType="com.jsdc.ybpt.formula.domain.dto.NotifyApplyDTO">
+        select
+            t1.ID,
+            t1.IS_IN_CATEGORY,
+            t1.CATEGORY_ID,
+            t1.NATIONAL_FORMULA_CODE,
+            t1.FORMULA_NAME,
+            t1.APPROVAL_NO,
+            t1.REGISTER_COMPANY_NAME,
+            t1.DOSAGE_FORM,
+            t1.SPECS,
+            t1.UNIT,
+            t1.PRICE,
+            t1.LOCAL_PM_PRICE,
+            t1.IS_DEL,
+            t1.CREATETIME,
+            t1.CREATEUSER,
+            t1.UPDATETIME,
+            t1.UPDATEUSER,
+            t1.STATUS,
+            t1.REJECT_REASON,
+            t1.REJECT_TIME,
+            t1.REJECT_USER,
+            t1.FIRST_CHECK_TIME,
+            t1.FIRST_CHECK_USER,
+            t1.SECOND_CHECK_TIME,
+            t1.SECOND_CHECK_USER,
+            t1.FINISH_CHECK_TIME,
+            t1.FINISH_CHECK_USER,
+            t1.GENERAL_ACCEPT_LETTER_TIME
+
+        from FORMULA_NOTIFY_APPLY t1
+        <where>
+        </where>
+        
+    </select>
+
+
+
+    <select id="getVOById" resultType="com.jsdc.ybpt.formula.domain.entity.NotifyApply"
+        parameterType="int">
+        select
+            t1.ID,
+            t1.IS_IN_CATEGORY,
+            t1.CATEGORY_ID,
+            t1.NATIONAL_FORMULA_CODE,
+            t1.FORMULA_NAME,
+            t1.APPROVAL_NO,
+            t1.REGISTER_COMPANY_NAME,
+            t1.DOSAGE_FORM,
+            t1.SPECS,
+            t1.UNIT,
+            t1.PRICE,
+            t1.LOCAL_PM_PRICE,
+            t1.IS_DEL,
+            t1.CREATETIME,
+            t1.CREATEUSER,
+            t1.UPDATETIME,
+            t1.UPDATEUSER,
+            t1.STATUS,
+            t1.REJECT_REASON,
+            t1.REJECT_TIME,
+            t1.REJECT_USER,
+            t1.FIRST_CHECK_TIME,
+            t1.FIRST_CHECK_USER,
+            t1.SECOND_CHECK_TIME,
+            t1.SECOND_CHECK_USER,
+            t1.FINISH_CHECK_TIME,
+            t1.FINISH_CHECK_USER,
+            t1.GENERAL_ACCEPT_LETTER_TIME
+
+        from FORMULA_NOTIFY_APPLY t1
+        <where>
+
+            and t1.ID = #{id}
+
+
+        </where>
+
+
+    </select>
+
+
+    <select id="applyPage" parameterType="com.jsdc.ybpt.formula.domain.entity.NotifyApply"
+        resultType="com.jsdc.ybpt.formula.domain.entity.NotifyApply">
+        SELECT
+            t1.ID,
+            t1.IS_IN_CATEGORY as isInCategory,
+            t1.CATEGORY_ID as categoryId,
+            t1.NATIONAL_FORMULA_CODE as nationalFormulaCode,
+            t1.FORMULA_NAME as formulaName,
+            t1.APPROVAL_NO as approvalNo,
+            t1.REGISTER_COMPANY_NAME as registerCompanyName,
+            t1.DOSAGE_FORM as dosageForm,
+            t1.SPECS,
+            t1.UNIT,
+            t1.PRICE,
+            t1.LOCAL_PM_PRICE as localPmPrice,
+            t1.IS_DEL as isDel,
+            t1.CREATETIME,
+            t1.CREATEUSER,
+            t1.UPDATETIME,
+            t1.UPDATEUSER,
+            t1.STATUS,
+            t1.REJECT_REASON as rejectReason,
+            t1.REJECT_TIME as rejectTime,
+            t1.REJECT_USER as rejectUser,
+            t1.FIRST_CHECK_TIME as firstCheckTime,
+            t1.FIRST_CHECK_USER as firstCheckUser,
+            t1.SECOND_CHECK_TIME as secondCheckTime,
+            t1.SECOND_CHECK_USER as secondCheckUser,
+            t1.FINISH_CHECK_TIME as finishCheckTime,
+            t1.FINISH_CHECK_USER as finishCheckUser,
+            t1.GENERAL_ACCEPT_LETTER_TIME as generalAcceptLetterTime,
+            t1.ORG_NAME as orgName,
+            t1.ORG_CODE as orgCode,
+            t1.CATEGORY_CODE as categoryCode,
+            t1.GENERIC_NAME_CODE as genericNameCode,
+            t1.PRODUCT_NAME_CODE as productNameCode,
+            t1.GOODS_NAME as goodsName,
+            t1.PAY_TYPE as payType,
+            t1.MIN_PRICE_UNIT as minPriceUnit,
+            t1.MIN_PACKAGE as minPackage,
+            t1.CATALOG_CODE as catalogCode,
+            t2.LABEL as fixBlngAdmdvsName,
+            t1.PDF_PATH as pdfPath,
+            t1.DOWN_PDF_PATH as downPdfPath,
+            t1.ACCEPT_LETTER_DOWN_PDF_PATH as acceptLetterDownPdfPath,
+            t1.ACCEPT_LETTER_PDF_PATH as acceptLetterPdfPath,
+            t1.LAST_APPLY_PRICE as lastApplyPrice,
+            t3.FIX_BLNG_ADMDVS as fixBlngAdmdvs,
+            t3.biznet
+        FROM
+            FORMULA_NOTIFY_APPLY t1
+            LEFT JOIN FIXMEDINS_B t3 on t1.ORG_CODE = t3.FIXMEDINS_CODE
+            LEFT JOIN sys_dict t2 on t3.FIX_BLNG_ADMDVS = t2.VALUE and t2.DICT_TYPE = 'ADMDVS'
+
+        WHERE
+            t1.IS_DEL = '0'
+          <if test="notifyApply.nationalFormulaCode != null and notifyApply.nationalFormulaCode != ''">
+              and t1.NATIONAL_FORMULA_CODE like concat(#{notifyApply.nationalFormulaCode},'%')
+          </if>
+
+        <if test="notifyApply.formulaName != null and notifyApply.formulaName != ''">
+            and t1.FORMULA_NAME like concat(#{notifyApply.formulaName},'%')
+        </if>
+
+        <if test="notifyApply.registerCompanyName != null and notifyApply.registerCompanyName != ''">
+            and t1.REGISTER_COMPANY_NAME like concat(#{notifyApply.registerCompanyName},'%')
+        </if>
+
+        <if test="notifyApply.status != null and notifyApply.status != ''">
+            and  t1.status = #{notifyApply.status}
+        </if>
+
+        <if test="notifyApply.orgCode != null and notifyApply.orgCode != ''">
+            and  t1.ORG_CODE = #{notifyApply.orgCode}
+        </if>
+
+        order by t1.CREATETIME desc
+
+
+    </select>
+
+</mapper>
+
+

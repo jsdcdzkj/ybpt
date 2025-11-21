@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jsdc.ybpt.mapper.appropNotice.AppropDocumentMapper">
+    <select id="pageQuery" resultType="com.jsdc.ybpt.appropNotice.entity.AppropDocument">
+        select
+            a.ID,
+            a.YEAR,
+            a.MONTH,
+            a.PUB_TIME as pubTime,
+            a.STATUS,
+            a.CREATE_TIME as createTime,
+            a.UPDATE_TIME as updateTime,
+            a.DOC_TYPE as docType,
+            a.DOC_NAME as docName,
+            a.TCQ,
+            (SELECT MIN(b.id) FROM APPROP_NOTICE b WHERE a.YEAR = b.YEAR AND a.MONTH = b.MONTH AND a.TCQ = b.TCQ AND b.IS_DEL = '0' ) AS noticeId
+        from APPROP_DOCUMENT a
+        where
+        a.IS_DEL='0'
+        <if test="appropDocumentPageDTO.year != null">
+            and a.YEAR = #{appropDocumentPageDTO.year}
+        </if>
+        <if test="appropDocumentPageDTO.month != null">
+            and a.MONTH = #{appropDocumentPageDTO.month}
+        </if>
+        <if test="appropDocumentPageDTO.createUser != null">
+           and ( a.CREATE_USER = #{appropDocumentPageDTO.createUser}
+            <if test="appropDocumentPageDTO.deptCode != null">
+                or a.DEPT_CODE = #{appropDocumentPageDTO.deptCode} )
+            </if>
+<!--            <if test="appropDocumentPageDTO.deptCode != null">-->
+<!--                and a.DEPT_CODE IS NULL )-->
+<!--                or ( a.DEPT_CODE = #{appropDocumentPageDTO.deptCode} )-->
+<!--            </if>-->
+            <if test="appropDocumentPageDTO.deptCode == null">
+                )
+            </if>
+        </if>
+
+        <if test="appropDocumentPageDTO.tcq != null">
+            and a.TCQ = #{appropDocumentPageDTO.tcq}
+        </if>
+        <if test="appropDocumentPageDTO.year != null">
+            and a.YEAR = #{appropDocumentPageDTO.year}
+        </if>
+        <if test="appropDocumentPageDTO.month != null">
+            and a.MONTH = #{appropDocumentPageDTO.month}
+        </if>
+        <if test="appropDocumentPageDTO.docName != null">
+            and a.DOC_NAME like concat(concat('%',#{appropDocumentPageDTO.docName}),'%')
+        </if>
+        <if test="appropDocumentPageDTO.docType != null">
+            and a.DOC_TYPE = #{appropDocumentPageDTO.docType}
+        </if>
+        <if test="appropDocumentPageDTO.status != null">
+            and a.STATUS = #{appropDocumentPageDTO.status}
+        </if>
+        <if test="appropDocumentPageDTO.beginCreateTime != null">
+            and to_char(a.create_time,'YYYY-MM-DD') <![CDATA[ >= ]]> #{appropDocumentPageDTO.beginCreateTime}
+        </if>
+        <if test="appropDocumentPageDTO.endCreateTime != null">
+            and to_char(a.create_time,'YYYY-MM-DD') <![CDATA[ <= ]]> #{appropDocumentPageDTO.endCreateTime}
+        </if>
+        order by a.YEAR desc,a.MONTH desc
+    </select>
+
+</mapper>
+
+

@@ -1,0 +1,5 @@
+com\jsdc\fddserver\service\SignService.class
+com\jsdc\fddserver\FddServerApplication.class
+com\jsdc\fddserver\utils\FileUtils.class
+com\jsdc\fddserver\controller\SignController.class
+com\jsdc\fddserver\controller\TestController.class

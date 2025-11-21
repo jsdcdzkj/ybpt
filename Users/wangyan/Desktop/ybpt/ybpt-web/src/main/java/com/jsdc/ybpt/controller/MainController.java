@@ -1,0 +1,103 @@
+package com.jsdc.ybpt.controller;
+
+import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.crypto.asymmetric.KeyType;
+import cn.hutool.crypto.asymmetric.RSA;
+import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.jsdc.ybpt.common.utils.RedisUtils;
+import com.jsdc.ybpt.model.SysUser;
+import com.jsdc.ybpt.service.SysUserService;
+import com.jsdc.ybpt.vo.ResultInfo;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.net.URLEncoder;
+import java.util.Arrays;
+
+/**
+ * @ClassName MainController
+ * @Description TODO
+ * @Author xujian
+ * @Date 2022/4/20 17:29
+ * @Version 1.0
+ */
+@RestController
+@RequestMapping("/")
+public class MainController {
+    @Autowired
+    private SysUserService sysUserService;
+
+    /**
+     * 验证码
+     * @return
+     */
+    @RequestMapping("/captcha")
+    public ResultInfo captcha(HttpServletRequest request){
+        return sysUserService.captcha(request);
+    }
+
+    /**
+     *  登录方法
+     * @param username
+     * @param password
+     * @return
+     */
+    @RequestMapping("/login")
+    public ResultInfo login(String username, String password,String cardinfo,String type,String captcha, String sessionId){
+        return sysUserService.login(username,password,cardinfo,type,captcha,sessionId);
+    }
+    @RequestMapping("/toLoginPage")
+    public void toLoginPage(HttpServletResponse response, String cardInfo) throws Exception{
+        //解密身份证
+        RSA rsa = new RSA(SysUserService.privateKey,null);
+        String cardNo = rsa.decryptStr(cardInfo, KeyType.PrivateKey);
+        SysUser sysUser = sysUserService.getOne(new QueryWrapper<SysUser>().eq("idNumber", cardNo).eq("is_del", "0"));
+        StpUtil.logout(sysUser.getId());
+        response.sendRedirect("http://192.168.0.152:3000/#/login?type=2&cardInfo="+ URLEncoder.encode(cardInfo));
+    }
+    /**
+     *  获取用户
+     * @param accessToken
+     * @return
+     */
+    @RequestMapping("/userInfo")
+    public ResultInfo userInfo(String accessToken){
+        SysUser sysUser =  sysUserService.getUser();
+        JSONObject result = new JSONObject();
+        result.put("permissions", Arrays.asList("admin"));
+        result.put("username", sysUser.getUsername());
+//        result.put("avatar", "https://i.gtimg.cn/club/item/face/img/8/15918_100.gif");
+        return ResultInfo.success(result);
+    }
+
+    /**
+     *  获取用户
+     * @param
+     * @return
+     */
+    @RequestMapping("/logout")
+    public ResultInfo logout(){
+        sysUserService.logout();
+        return ResultInfo.success();
+    }
+
+
+    @PostMapping("/unlock")
+    public ResultInfo unlock(String userId){
+        SysUser sysUser = sysUserService.getById(userId);
+        if(sysUser != null && "1".equals(sysUser.getLockFlag())){
+            sysUser.setLockFlag("0");
+            sysUser.updateById();
+        }else{
+            return ResultInfo.error("该用户未被锁定");
+        }
+        return ResultInfo.success();
+    }
+
+}

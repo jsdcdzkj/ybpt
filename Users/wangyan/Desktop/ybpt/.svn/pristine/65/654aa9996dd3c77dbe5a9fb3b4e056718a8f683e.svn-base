@@ -1,0 +1,189 @@
+# 对账接口文档
+
+## 1.日对账接口
+
+### 1.1	功能描述：
+
+​	机构每日对账
+
+### 1.2	接口描述
+
+- 请求协议： http
+
+
+- 请求方式： post
+- 接口地址：/api/day_reconciliation
+
+
+- 输入参数：
+
+  | 参数名称   | 参数属性           | 类型     | 是否必填 | 描述         |
+  | ------ | -------------- | ------ | ---- | ---------- |
+  | 定点机构编号 | fixmedins_code | String | Y    |            |
+  | 对账结算日期 | settle_date    | String | Y    | yyyy-MM-dd |
+  | 日对账明细  | day_details    | List   | Y    |            |
+
+  | day_details |                     |        |      |      |
+  | ----------- | ------------------- | ------ | ---- | ---- |
+  | 参数名称        | 参数属性                | 类型     | 是否必填 | 描述   |
+  | 对账类型        | reconciliation_type | String | Y    | 见字典  |
+  | 统筹区         | insu_admdvs         | String | Y    | 见字典  |
+  | 医疗费总额       | medfee_sumamt       | String | Y    |      |
+  | 统筹基金支出      | hifp_pay            | String | Y    |      |
+  | 公务员医疗补助     | cvlserv_pay         | String | Y    |      |
+  | 补充医疗保险基金    | hifes_pay           | String | Y    |      |
+  | 大病补充医疗保险基金  | hifmi_pay           | String | Y    |      |
+  | 大额医疗补助基金    | hifob_pay           | String | Y    |      |
+  | 医疗救助基金      | maf_pay             | String | Y    |      |
+  | 其他基金        | othfund_pay         | String | Y    |      |
+  | 个人账户支出      | acct_pay            | String | Y    |      |
+  | 现金支付金额      | cash_payamt         | String | Y    |      |
+  | 自费医院负担部分    | ownpay_hosp_part    | String | Y    |      |
+  | 人数          | person_num          | String | Y    |      |
+  | 人次          | person_count        | String | Y    |      |
+
+
+- 输出参数
+
+  | 参数名称       | 参数属性                | 类型     | 是否必填 | 描述                   |
+  | ---------- | ------------------- | ------ | ---- | -------------------- |
+  | 定点机构编号     | fixmedins_code      | String | Y    |                      |
+  | 结算日期       | settle_date         | String | Y    | yyyy-MM-dd           |
+  | 对账类型       | reconciliation_type | String | Y    | 见字典                  |
+  | 统筹区        | insu_admdvs         | String | Y    | 见字典                  |
+  | 医疗费总额      | medfee_sumamt       | String | Y    |                      |
+  | 统筹基金支出     | hifp_pay            | String | Y    |                      |
+  | 公务员医疗补助    | cvlserv_pay         | String | Y    |                      |
+  | 补充医疗保险基金   | hifes_pay           | String | Y    |                      |
+  | 大病补充医疗保险基金 | hifmi_pay           | String | Y    |                      |
+  | 大额医疗补助基金   | hifob_pay           | String | Y    |                      |
+  | 医疗救助基金     | maf_pay             | String | Y    |                      |
+  | 其他基金       | othfund_pay         | String | Y    |                      |
+  | 个人账户支出     | acct_pay            | String | Y    |                      |
+  | 现金支付金额     | cash_payamt         | String | Y    |                      |
+  | 自费医院负担部分   | ownpay_hosp_part    | String | Y    |                      |
+  | 人数         | person_num          | String | Y    |                      |
+  | 人次         | person_count        | String | Y    |                      |
+  | 对账时间       | check_time          | String | Y    | yyyy-MM-dd           |
+  | 对账结果       | check_status        | String | Y    | 0：未对账 1：对账通过 2：对账不通过 |
+  | 对账结果说明     | result_msg          | String | Y    |                      |
+
+## 2.月对账接口
+
+### 2.1	功能描述：
+
+​	机构每月对账
+
+### 2.2	接口描述
+
+- 请求协议： http
+
+
+- 请求方式： post
+- 接口地址：/api/month_reconciliation
+
+
+- 输入参数：
+
+  | 参数名称   | 参数属性           | 类型     | 是否必填 | 描述      |
+  | ------ | -------------- | ------ | ---- | ------- |
+  | 定点机构编号 | fixmedins_code | String | Y    |         |
+  | 对账结算日期 | settle_date    | String | Y    | yyyy-MM |
+  | 月对账明细  | month_details  | List   | Y    |         |
+
+  | month_details |                     |        |      |      |
+  | ------------- | ------------------- | ------ | ---- | ---- |
+  | 参数名称          | 参数属性                | 类型     | 是否必填 | 描述   |
+  | 对账类型          | reconciliation_type | String | Y    | 见字典  |
+  | 统筹区           | insu_admdvs         | String | Y    | 见字典  |
+  | 医疗费总额         | medfee_sumamt       | String | Y    |      |
+  | 统筹基金支出        | hifp_pay            | String | Y    |      |
+  | 公务员医疗补助       | cvlserv_pay         | String | Y    |      |
+  | 补充医疗保险基金      | hifes_pay           | String | Y    |      |
+  | 大病补充医疗保险基金    | hifmi_pay           | String | Y    |      |
+  | 大额医疗补助基金      | hifob_pay           | String | Y    |      |
+  | 医疗救助基金        | maf_pay             | String | Y    |      |
+  | 其他基金          | othfund_pay         | String | Y    |      |
+  | 个人账户支出        | acct_pay            | String | Y    |      |
+  | 现金支付金额        | cash_payamt         | String | Y    |      |
+  | 自费医院负担部分      | ownpay_hosp_part    | String | Y    |      |
+  | 人数            | person_num          | String | Y    |      |
+  | 人次            | person_count        | String | Y    |      |
+
+
+- 输出参数
+
+  | 参数名称       | 参数属性                | 类型     | 是否必填 | 描述                   |
+  | ---------- | ------------------- | ------ | ---- | -------------------- |
+  | 定点机构编号     | fixmedins_code      | String | Y    |                      |
+  | 结算日期       | settle_date         | String | Y    | yyyy-MM              |
+  | 对账类型       | reconciliation_type | String | Y    | 见字典                  |
+  | 统筹区        | insu_admdvs         | String | Y    | 见字典                  |
+  | 医疗费总额      | medfee_sumamt       | String | Y    |                      |
+  | 统筹基金支出     | hifp_pay            | String | Y    |                      |
+  | 公务员医疗补助    | cvlserv_pay         | String | Y    |                      |
+  | 补充医疗保险基金   | hifes_pay           | String | Y    |                      |
+  | 大病补充医疗保险基金 | hifmi_pay           | String | Y    |                      |
+  | 大额医疗补助基金   | hifob_pay           | String | Y    |                      |
+  | 医疗救助基金     | maf_pay             | String | Y    |                      |
+  | 其他基金       | othfund_pay         | String | Y    |                      |
+  | 个人账户支出     | acct_pay            | String | Y    |                      |
+  | 现金支付金额     | cash_payamt         | String | Y    |                      |
+  | 自费医院负担部分   | ownpay_hosp_part    | String | Y    |                      |
+  | 人数         | person_num          | String | Y    |                      |
+  | 人次         | person_count        | String | Y    |                      |
+  | 对账时间       | check_time          | String | Y    | yyyy-MM-dd           |
+  | 对账结果       | check_status        | String | Y    | 0：未对账 1：对账通过 2：对账不通过 |
+  | 对账结果说明     | result_msg          | String | Y    |                      |
+
+## 3.字典
+
+### 3.1对账类型
+
+| 代码名称           | 代码值              |
+| -------------- | ---------------- |
+| 职工门诊(含血液特殊病)   | staff_mz         |
+| 职工住院           | staff_zy         |
+| 职工家床           | staff_jc         |
+| 职工门诊单病种        | staff_dbz        |
+| 职工住院单病种（含日间手术） | staff_dbz_day    |
+| 职工生育           | staff_sy         |
+| 职工住院按床日付费      | staff_zy_day     |
+| 居民门诊（含血液特殊病）   | resident_mz      |
+| 居民住院（含家床）      | resident_zy      |
+| 居民门诊单病种        | resident_dbz     |
+| 居民住院单病种（含日间手术） | resident_dbz_day |
+| 居民生育           | resident_sy      |
+| 居民住院按床日付费      | resident_zy_day  |
+| 伤残军人门诊         | servicemen_mz    |
+| 伤残军人住院         | servicemen_zy    |
+| 离休门诊           | retire_mz        |
+| 离休住院           | retire_zy        |
+| 个人灵活就业人员生育     | personal_sy      |
+
+### 3.2对账类型(异地)
+
+| 代码名称          | 代码值           |
+| ------------- | ------------- |
+| 职工门诊（异地）      | staff_mz      |
+| 职工住院（异地）      | staff_zy      |
+| 居民门诊（异地）      | resident_mz   |
+| 居民住院（含家床）（异地） | resident_zy   |
+| 伤残军人门诊（异地）    | servicemen_mz |
+| 伤残军人住院（异地）    | servicemen_zy |
+
+### 3.3 统筹区
+
+| 代码名称   | 代码值    |
+| ------ | ------ |
+| 徐州市市本级 | 320399 |
+| 铜山区    | 320312 |
+| 丰县     | 320321 |
+| 沛县     | 320322 |
+| 睢宁县    | 320324 |
+| 新沂市    | 320381 |
+| 邳州市    | 320382 |
+| 贾汪区    | 320305 |
+| 省内异地   | 3      |
+| 跨省异地   | 4      |
+

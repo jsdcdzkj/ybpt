@@ -1,0 +1,486 @@
+<template>
+  <div class="main-container">
+    <el-row :gutter="20">
+      <el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+        <el-card class="card" shadow="never">
+          <div slot="header">
+            <span class="tips">查询条件</span>
+            <div class="right">
+              <el-button
+                icon="el-icon-search"
+                type="primary"
+                @click="queryData"
+              >
+                查 询
+              </el-button>
+              <!--<el-button icon="el-icon-refresh-left">重 置</el-button>-->
+            </div>
+          </div>
+          <el-form label-width="160px">
+            <el-row :gutter="20">
+              <el-col :xs="24" :sm="24" :md="8" :lg="8" :xl="4" v-show="userinfo.user_type == 1">
+                <el-form-item label="机构编码">
+                  <el-input
+                    v-model="queryForm.org_code"
+                    @keydown.enter.native="queryData"
+                    clearable
+                  ></el-input>
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="24" :md="8" :lg="8" :xl="4" v-show="userinfo.user_type == 1">
+                <el-form-item label="机构名称">
+                  <el-input
+                    v-model="queryForm.org_name"
+                    @keydown.enter.native="queryData"
+                    clearable
+                  ></el-input>
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="24" :md="8" :lg="8" :xl="4" v-show="userinfo.user_type == 1 && userinfo.org_code == 320399">
+                <el-form-item label="统筹区" prop="admdvs">
+                  <el-select clearable
+                             @change="queryData"
+                             v-model.trim="queryForm.admdvs"
+                             class="w">
+                    <el-option v-for="item in admdvs" :key="item.value" :label="item.label" :value="item.value">
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="24" :md="8" :lg="8" :xl="4">
+                <el-form-item label="状态">
+                  <el-select clearable
+                          v-model="queryForm.status"
+                          @change="queryData"
+                          style="width: 100%"
+                  >
+                    <el-option
+                            label="待提交"
+                            value="1"
+                    ></el-option>
+<!--                    <el-option-->
+<!--                            label="已提交"-->
+<!--                            value="2"-->
+<!--                    ></el-option>-->
+                    <el-option
+                        label="已审核"
+                        value="3"
+                    ></el-option>
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-form>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+        <el-card class="card" shadow="never">
+          <div slot="header">
+              <span class="tips">清算确认列表</span>
+            <el-button icon="el-icon-download" type="primary" @click="handleExport">
+              导出
+            </el-button>
+          </div>
+
+          <el-table @current-change="handleCurrentChange" @selection-change="setSelectRows"
+            v-loading="listLoading"
+            ref="listTable"
+            stripe
+            :data="list"
+            :element-loading-text="elementLoadingText"
+            highlight-current-row
+            border
+            height="calc(100vh - 540px)"
+          >
+            <el-table-column
+              show-overflow-tooltip
+              label="机构编码"
+              align="center"
+              prop="org_code"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              label="机构名称"
+              align="center"
+              prop="org_name"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              label="年份"
+              align="center"
+              prop="year"
+            ></el-table-column>
+            <el-table-column
+                show-overflow-tooltip
+                label="统筹区"
+                align="center"
+                prop="admdvs"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="org_sign_time"
+              label="机构签章时间"
+              align="center"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="centre_sign_time"
+              label="医保中心签章时间"
+              align="center"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="status"
+              label="状态"
+              align="center"
+            >
+              <template #default="{ row }">
+                <el-tag type="info"  :key="index" v-if="row.status == 1">
+                  待提交
+                </el-tag>
+                <el-tag type="danger"  :key="index" v-else-if="row.status == 2 ">
+                  已提交
+                </el-tag>
+                <el-tag type="success"  :key="index" v-else-if="row.status == 3 ">
+                  已审核
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column
+                show-overflow-tooltip
+                label="操作"
+                align="center"
+                fixed="right"
+                width="120"
+            >
+              <template #default="{ row }">
+                <el-button plain @click="handleView(row)" size="mini">
+                  查看
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-pagination
+            background
+            :current-page="queryForm.pageIndex"
+            :page-size="queryForm.pageSize"
+            :total="queryForm.total"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange2"
+          ></el-pagination>
+        </el-card>
+      </el-col>
+    </el-row>
+    <el-dialog
+        title="类别维护"
+        :visible.sync="dialogFormCategoryVisible"
+        width="730px"
+        @closeChildDialog="close"
+        @close="close"
+    >
+      <el-form ref="form" label-width="110px">
+        <el-row :gutter="20">
+          <el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+            <el-form-item label="类别" prop="category">
+              <el-select
+                  v-model.trim="category"
+                  class="w"
+              >
+                <el-option value="1" label="门诊"></el-option>
+                <el-option value="2" label="住院"></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="closeCategory">取 消</el-button>
+        <el-button type="primary" @click="saveCategory">
+          确定
+        </el-button>
+      </div>
+    </el-dialog>
+    <el-dialog
+      title="协议等级维护"
+      :visible.sync="dialogFormVisible"
+      width="730px"
+      @closeChildDialog="close"
+      @close="close"
+    >
+      <el-form ref="form" :model="form" label-width="110px">
+        <el-row :gutter="20">
+          <el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+            <el-form-item label="机构类别" prop="jgType">
+              <el-select
+                v-model.trim="aggrement.jgType"
+                class="w"
+                @change="changeLevel"
+              >
+                <el-option value="1" label="医疗机构"></el-option>
+                <el-option value="2" label="零售药店"></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+            <el-form-item label="机构等级" prop="jgLevel">
+              <el-select
+                v-model="aggrement.jgLevel"
+                collapse-tags
+                placeholder="请选择"
+                class="w"
+              >
+                <el-option
+                  v-for="item in options"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                ></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+
+          <el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+            <el-form-item label="配置" prop="jgIds">
+              <el-transfer
+                filterable
+                filter-placeholder="请输入关键字"
+                :titles="[' ', ' ']"
+                @mouseover.native="addTitle"
+                v-model="aggrement.medicalCodeList"
+                :data="orgs"
+              ></el-transfer>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="close">取 消</el-button>
+        <el-button type="primary" @click="save" :disabled="this.isDisableSave">
+          确定
+        </el-button>
+      </div>
+    </el-dialog>
+
+    <views ref="views" @fetch-data="queryData"></views>
+  </div>
+</template>
+<script>
+import Views from './components/view'
+import {exportList, getList} from '@/api/liquidation'
+import {editAggrementLevel, editData, selectAll} from '@/api/fixmedins.js'
+import {getDicts} from "@/api/dictManagement";
+
+export default {
+  name: 'jgglist',
+  components: { Views },
+  data() {
+    return {
+      aList: [
+        { id: 1, name: '一级' },
+        { id: 2, name: '二级' },
+        { id: 3, name: '三级' },
+        { id: 9, name: '未定级' },
+      ],
+      bList: [
+        { id: 4, name: 'A级' },
+        { id: 5, name: 'B级' },
+        { id: 6, name: 'C级' },
+      ],
+      userinfo: null,
+      levelList: [],
+      queryForm: {
+        pageIndex: 1,
+        pageSize: 10,
+        total: 0,
+        fixmedins_code: '',
+        fixmedins_name: '',
+      },
+      selectRows: '',
+      category: '',
+      listLoading: false,
+      form: {},
+      elementLoadingText: '加载数据中...',
+      list: [],
+      isDisableSave: false,
+      dialogFormVisible: false,
+      dialogFormCategoryVisible: false,
+      loading: false,
+      options: [],
+      aggrement: {},
+      orgs: [],
+      admdvs: [],
+    }
+  },
+  created() {
+    this.userinfo = JSON.parse(localStorage.getItem("userinfo"));
+    console.log(this.userinfo);
+    if (this.userinfo.user_type == '1') {
+      this.queryForm.admdvs = this.userinfo.org_code;
+    } else {
+      this.queryForm.org_code = this.userinfo.org_code;
+    }
+    this.fetchData()
+    this.getAdmdvs();
+  },
+
+  beforeDestroy() {},
+
+  mounted() {},
+  methods: {
+    //获取统筹区
+    async getAdmdvs() {
+      const res = await getDicts({ "type": "admdvs-area" });
+      if (res.code == "0") {
+        this.admdvs = res.data;
+      }
+    },
+    handleView(row) {
+      this.$refs['views'].showDia(row)
+    },
+    queryData() {
+      this.queryForm.pageIndex = 1
+      this.fetchData()
+    },
+    setSelectRows(val) {
+      this.selectRows = val
+    },
+    handleCurrentChange(val) {
+      this.selectRows = val
+    },
+    fetchData() {
+      getList(this.queryForm).then((res) => {
+        if (res.code == 0) {
+          this.list = res.data.records
+          this.queryForm.total = res.data.total
+        }
+      })
+    },
+    addTitle(e) {
+      const target = e.target
+      if (target.title) return
+      target.title = target.innerText
+    },
+    handleSizeChange(val) {
+      this.queryForm.pageSize = val
+      this.fetchData()
+    },
+    handleCurrentChange2(val) {
+      this.queryForm.pageIndex = val
+      this.fetchData()
+    },
+    handleCategory() {
+      if(this.selectRows.cred_lv_name == '医疗机构'){
+        this.category = this.selectRows.category
+        this.dialogFormCategoryVisible = true
+      }else{
+        this.$baseMessage('请选择类型为【医疗机构】', 'error')
+      }
+    },
+    // 协议等级维护
+    handleAggrement() {
+      this.dialogFormVisible = true
+    },
+    changeLevel() {
+      if (this.aggrement.jgType == 1) {
+        this.options = [
+          { id: '9', name: '未定级' },
+          { id: '1', name: '一级' },
+          { id: '2', name: '二级' },
+          { id: '3', name: '三级' },
+        ]
+      } else if (this.aggrement.jgType == 2) {
+        this.options = [
+          { id: '4', name: 'A级' },
+          { id: '5', name: 'B级' },
+          { id: '6', name: 'C级' },
+        ]
+      }
+      this.getOrgs()
+    },
+    getOrgs() {
+      console.log(this.aggrement.jgType)
+      selectAll({ fixmedins_type: this.aggrement.jgType }).then((res) => {
+        if (res.code == 0) {
+          this.orgs = res.data
+        }
+      })
+    },
+    closeCategory() {
+      this.dialogFormCategoryVisible = false
+    },
+    close() {
+      this.dialogFormVisible = false
+    },
+    saveCategory(){
+      if (null == this.category || '' == this.category || undefined == this.category) {
+        this.$baseMessage('请选择类别', 'error')
+        return false
+      }
+      editData({
+        id: this.selectRows.id,
+        category: this.category,
+      }).then((res) => {
+        if (res.code == 0) {
+          this.$baseMessage('操作成功', 'success')
+          this.dialogFormCategoryVisible = false
+          this.fetchData()
+        } else {
+          this.$baseMessage('同步失败', 'error')
+        }
+      })
+    },
+    save() {
+      this.isDisableSave = true
+      if (
+        null == this.aggrement.medicalCodeList ||
+        undefined == this.aggrement.medicalCodeList ||
+        this.aggrement.medicalCodeList.length < 1
+      ) {
+        that.$baseMessage('请选择单位', 'error')
+        this.isDisableSave = false
+        return false
+      }
+      editAggrementLevel({
+        level: this.aggrement.jgLevel,
+        ids: this.aggrement.medicalCodeList,
+      }).then((res) => {
+        if (res.code == 0) {
+          this.$baseMessage('操作成功', 'success')
+          this.dialogFormVisible = false
+          this.fetchData()
+        } else {
+          this.$baseMessage('同步失败', 'error')
+        }
+        this.isDisableSave = true
+      })
+    },
+    handleExport() {
+      this.$baseConfirm('你确定要导出当前信息吗', null, async () => {
+        this.listLoading = true
+        await exportList(this.queryForm).then((res) => {
+          let fileName = "清算确认数据导出.xlsx";
+          let objectUrl = URL.createObjectURL(new Blob([res.data]))
+          const link = document.createElement('a')
+          link.download = decodeURI(fileName)
+          link.href = objectUrl
+          link.click()
+          this.listLoading = false;
+          this.$baseMessage("导出成功！", 'success')
+        })
+
+      })
+    },
+  },
+}
+</script>
+<style scoped>
+::v-deep .el-input {
+  width: auto !important;
+}
+::v-deep .el-tree-node__label {
+  overflow: hidden;
+  word-break: keep-all;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+</style>

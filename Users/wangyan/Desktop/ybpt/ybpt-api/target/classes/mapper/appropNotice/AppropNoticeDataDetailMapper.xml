@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jsdc.ybpt.mapper.appropNotice.AppropNoticeDataDetailMapper">
+    <select id="mergeData" resultType="com.jsdc.ybpt.appropNotice.entity.AppropNoticeDataDetail">
+        select
+            YEAR,MONTH,
+            sum(ZG_LJ_FSZFY) as zgLjFszfy,sum(ZG_LJ_TCJJFSJE) as zgLjTcjjfsje,
+            sum(ZG_LJ_DBJJFSJE) as zgLjDbjjfsje, sum(ZG_LJ_GWYJJFSJE) as zgLjGwyjjfsje,
+            sum(ZG_LJ_JZJJFSJE) as zgLjJzjjfsje, sum(ZG_LJ_SCJJFSJE) as zgLjScjjfsje,
+            sum(ZG_LJ_GZJJFSJE) as zgLjGzjjfsje,
+            sum(ZG_LJ_XJ) as zgLjXj, sum(ZG_LJ_JSXJ) as zgLjJsxj, sum(ZG_LJ_TCJJJSJE) as zgLjTcjjjsje,
+            sum(ZG_LJ_DBJJJSJE) as zgLjDbjjjsje, sum(ZG_LJ_GWYJJJSJE) as zgLjGwyjjjsje,
+            sum(ZG_LJ_JZJJJSJE) as zgLjJzjjjsje,
+            sum(ZG_LJ_SCJJJSJE) as zgLjScjjjsje, sum(ZG_LJ_GZJJJSJE) as zgLjGzjjjsje,
+            sum(ZG_LJ_JJBFXJ) as zgLjJjbfxj,
+            sum(ZG_LJ_JJBFJE) as zgLjJjbfje, sum(ZG_LJ_KHBZJ) as zgLjKhbzj, sum(ZG_LJ_KK) as zgLjKk,
+            sum(ZG_DY_FSZFY) as zgDyFszfy, sum(ZG_DY_TCJJFSJE) as zgDyTcjjfsje, sum(ZG_DY_DBJJFSJE) as zgDyDbjjfsje,
+            sum(ZG_DY_GWYJJFSJE) as zgDyGwyjjfsje, sum(ZG_DY_JZJJFSJE) as zgDyJzjjfsje,
+            sum(ZG_DY_SCJJFSJE) as zgDyScjjfsje,
+            sum(ZG_DY_GZJJFSJE) as zgDyGzjjfsje, sum(ZG_DY_XJ) as zgDyXj, sum(ZG_DY_JSXJ) as zgDyJsxj,
+            sum(ZG_DY_TCJJJSJE) as zgDyTcjjjsje, sum(ZG_DY_DBJJJSJE) as zgDyDbjjjsje, sum(ZG_DY_GWYJJJSJE) as zgDyGwyjjjsje,
+            sum(ZG_DY_JZJJJSJE) as zgDyJzjjjsje, sum(ZG_DY_SCJJJSJE) as zgDyScjjjsje, sum(ZG_DY_GZJJJSJE) as zgDyGzjjjsje,
+            sum(ZG_DY_JJBFXJ) as zgDyJjbfxj, sum(ZG_DY_JJBFJE) as zgDyJjbfje, sum(ZG_DY_KHBZJ) as zgDyKhbzj,
+            sum(ZG_DY_KK) as zgDyKk,
+
+            sum(JM_LJ_FSZFY) as jmLjFszfy, sum(JM_LJ_TCJJFSJE) as jmLjTcjjfsje,
+            sum(JM_LJ_DBJJFSJE) as jmLjDbjjfsje, sum(JM_LJ_JZJJFSJE) as jmLjJzjjfsje, sum(JM_LJ_GJZHFSJE) as jmLjGjzhfsje,
+            sum(JM_LJ_XJ) as jmLjXj,
+            sum(JM_LJ_JSXJ) as jmLjJsxj, sum(JM_LJ_TCJJJSJE) as jmLjTcjjjsje, sum(JM_LJ_DBJJJSJE) as jmLjDbjjjsje,
+            sum(JM_LJ_JZJJJSJE) as jmLjJzjjjsje, sum(JM_LJ_GJZHJSJE) as jmLjGjzhjsje,
+            sum(JM_LJ_JJBFXJ) as jmLjJjbfxj,
+            sum(JM_LJ_JJBFJE) as jmLjJjbfje, sum(JM_LJ_DBSBBFJE) as jmLjDbsbbfje,
+            sum(JM_LJ_KHBZJ) as jmLjKhbzj,
+            sum(JM_LJ_KK) as jmLjKk, sum(JM_DY_FSZFY) as jmDyFszfy, sum(JM_DY_TCJJFSJE) as jmDyTcjjfsje,
+            sum(JM_DY_DBJJFSJE) as jmDyDbjjfsje, sum(JM_DY_JZJJFSJE) as jmDyJzjjfsje, sum(JM_DY_GJZHFSJE) as jmDyGjzhfsje,
+            sum(JM_DY_XJ) as jmDyXj, sum(JM_DY_JSXJ) as jmDyJsxj,
+            sum(JM_DY_TCJJJSJE) as jmDyTcjjjsje,
+            sum(JM_DY_DBJJJSJE) as jmDyDbjjjsje, sum(JM_DY_JZJJJSJE) as jmDyJzjjjsje, sum(JM_DY_GJZHJSJE) as jmDyGjzhjsje,
+            sum(JM_DY_JJBFXJ) as jmDyJjbfxj, sum(JM_DY_JJBFJE) as jmDyJjbfje, sum(JM_DY_DBSBBFJE) as jmDyDbsbbfje,
+            sum(JM_DY_KHBZJ) as jmDyKhbzj, sum(JM_DY_KK) as jmDyKk
+        from APPROP_NOTICE_DATA_DETAIL
+        where YEAR = #{year} and MONTH = #{month}
+        AND IS_DEL = '0'
+        group by YEAR, MONTH
+    </select>
+
+</mapper>
+
+

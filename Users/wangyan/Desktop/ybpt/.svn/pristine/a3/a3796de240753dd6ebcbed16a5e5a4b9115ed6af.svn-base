@@ -1,0 +1,317 @@
+package com.jsdc.ybpt.service.eval;
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.jsdc.ybpt.base.BaseService;
+import com.jsdc.ybpt.eval_.EvalFormulaConfig;
+import com.jsdc.ybpt.eval_.EvalOrgTask;
+import com.jsdc.ybpt.eval_.EvalTaskManage;
+import com.jsdc.ybpt.util.MathExpressionSolver;
+import com.jsdc.ybpt.vo.ResultInfo;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class EvalFormulaConfigService extends BaseService<EvalFormulaConfig> {
+    @Autowired
+    private EvalOrgTaskService evalOrgTaskService;
+    @Autowired
+    private EvalFormulaConfigService evalFormulaConfigService;
+    @Autowired
+    private EvalTaskManageService evalTaskManageService;
+
+    public ResultInfo genEarnestMoney(String taskManageId){
+        //任务主表
+        EvalTaskManage taskManage = evalTaskManageService.getById(taskManageId);
+        QueryWrapper<EvalOrgTask> qw = new QueryWrapper();
+        qw.eq("isDel","0");
+        qw.eq("taskManageId",taskManageId);
+        List<EvalOrgTask> orgTasks = evalOrgTaskService.list(qw);
+        //获取公式集合
+        List<EvalFormulaConfig> configList = evalFormulaConfigService.list(new QueryWrapper<EvalFormulaConfig>().eq("isDel","0").orderByAsc("createTime"));
+        //职工
+        this.genEarnestMoney_staff(taskManage,orgTasks,configList);
+        //居民
+        this.genEarnestMoney_resident(taskManage,orgTasks,configList);
+        //医疗救助
+        this.genEarnestMoney_medical(taskManage,orgTasks,configList);
+        return ResultInfo.success();
+    }
+
+    //职工保证金计算
+    public ResultInfo genEarnestMoney_staff(EvalTaskManage taskManage,List<EvalOrgTask> orgTasks,List<EvalFormulaConfig> configList){
+        //定义需要进行计算的中间变量
+        //P:机构指数 M：待分配奖励金 X: 待分配系数 G:机构保证金
+        BigDecimal P,M,X,G;
+        //待分配奖励金,逐步减去低绩效返还的保证金和高绩效的保证金，剩下的就是可以分配的奖励金
+        M = new BigDecimal(taskManage.getStaffSumEarnestMoney());
+        //高绩效机构集合
+        List<EvalOrgTask> overOrgs = new ArrayList<>();
+        //所有机构带分配系数和
+        BigDecimal allFactor = BigDecimal.ZERO;
+        //高绩效公式
+        String overFormula = "";
+        //遍历机构考核单，分配保证金
+        for (EvalOrgTask orgTask : orgTasks) {
+            //如果对应保证金是0，则没必要参与考核
+            if(BigDecimal.ZERO.compareTo(new BigDecimal(orgTask.getMarginStaff())) >= 0){
+                continue;
+            }
+            //机构指数
+            P = new BigDecimal(orgTask.getOrgRate());
+            //机构保证金
+            G = new BigDecimal(orgTask.getMarginStaff());
+            //判断是否高绩效(获取公式包含M参数，奖励金)
+            String formula = getFormula(configList,orgTask.getOrgRate());
+            if(!formula.contains("M")){
+                //正常处理
+                String formulaStr = formula.replace("P",orgTask.getOrgRate()).replace("G",orgTask.getMarginStaff());
+                BigDecimal refund = MathExpressionSolver.evaluateFormula(formulaStr);
+                orgTask.setRefundStaff(refund.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                orgTask.setStaffRewards(refund.subtract(G).setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                //减去已返还保证金
+                M = M.subtract(refund);
+                orgTask.updateById();
+            }else{
+                //高绩效
+                overOrgs.add(orgTask);
+                //系数是保证金*机构指数
+                allFactor = allFactor.add(P.multiply(G));
+                overFormula = formula;
+                //减去高绩效本身的保证金才是奖励金
+                M = M.subtract(new BigDecimal(orgTask.getMarginStaff()));
+            }
+        }
+        taskManage.setStaffRewards(M.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+        taskManage.updateById();
+        //遍历高绩效考核单，进行分配(最后一家机构获取剩余金额，size-1去遍历)
+        BigDecimal lastMoney = M;
+        if(overOrgs != null && overOrgs.size() > 0){
+            for (int i = 0; i < overOrgs.size()-1; i++) {
+                EvalOrgTask overOrg = overOrgs.get(i);
+                //机构指数
+                P = new BigDecimal(overOrg.getOrgRate());
+                //机构保证金
+                G = new BigDecimal(overOrg.getMarginStaff());
+                //待分配系数
+                X = (P.multiply(G)).divide(allFactor,4, BigDecimal.ROUND_HALF_UP);
+                //计算返还金额
+                String overFormulaStr = overFormula.replace("G",G.toString())
+                        .replace("M",M.toString())
+                        .replace("X",X.toString())
+                        .replace("P",P.toString());
+                BigDecimal refund = MathExpressionSolver.evaluateFormula(overFormulaStr);
+                overOrg.setRefundStaff(refund.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                overOrg.setStaffRewards(refund.subtract(G).setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                overOrg.updateById();
+                //剩下的钱
+                lastMoney = lastMoney.subtract(new BigDecimal(overOrg.getStaffRewards()));
+            }
+            //把剩下的钱全部给最后一个机构，确保奖池可以分干净 2023012-09改动
+            EvalOrgTask lastOrg = overOrgs.get(overOrgs.size()-1);
+            lastOrg.setStaffRewards(lastMoney.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+            lastOrg.setRefundStaff(new BigDecimal(lastOrg.getMarginStaff()).add(lastMoney).setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+            lastOrg.updateById();
+        }
+
+//        这样无法保证能完全分配 2023-12-09
+//        for (EvalOrgTask overOrg : overOrgs) {
+//            //机构指数
+//            P = new BigDecimal(overOrg.getOrgRate());
+//            //机构保证金
+//            G = new BigDecimal(overOrg.getMargin());
+//            //待分配系数
+//            X = (P.multiply(G)).divide(allFactor,4, BigDecimal.ROUND_HALF_UP);
+//            //计算返还金额
+//            String overFormulaStr = overFormula.replace("G",G.toString())
+//                    .replace("M",M.toString())
+//                    .replace("X",X.toString())
+//                    .replace("P",P.toString());
+//            BigDecimal refund = MathExpressionSolver.evaluateFormula(overFormulaStr);
+//            overOrg.setRefund(refund.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+//            overOrg.setRewards(refund.subtract(G).setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+//            overOrg.updateById();
+//        }
+        return ResultInfo.success();
+    }
+
+    //居民保证金计算
+    public ResultInfo genEarnestMoney_resident(EvalTaskManage taskManage,List<EvalOrgTask> orgTasks,List<EvalFormulaConfig> configList){
+        //定义需要进行计算的中间变量
+        //P:机构指数 M：待分配奖励金 X: 待分配系数 G:机构保证金
+        BigDecimal P,M,X,G;
+        //待分配奖励金,逐步减去低绩效返还的保证金和高绩效的保证金，剩下的就是可以分配的奖励金
+        M = new BigDecimal(taskManage.getResidentSumEarnestMoney());
+        //高绩效机构集合
+        List<EvalOrgTask> overOrgs = new ArrayList<>();
+        //所有机构带分配系数和
+        BigDecimal allFactor = BigDecimal.ZERO;
+        //高绩效公式
+        String overFormula = "";
+        //遍历机构考核单，分配保证金
+        for (EvalOrgTask orgTask : orgTasks) {
+            if(BigDecimal.ZERO.compareTo(new BigDecimal(orgTask.getMarginResident())) >= 0){
+                continue;
+            }
+            //机构指数
+            P = new BigDecimal(orgTask.getOrgRate());
+            //机构保证金
+            G = new BigDecimal(orgTask.getMarginResident());
+            //判断是否高绩效(获取公式包含M参数，奖励金)
+            String formula = getFormula(configList,orgTask.getOrgRate());
+            if(!formula.contains("M")){
+                //正常处理
+                String formulaStr = formula.replace("P",orgTask.getOrgRate()).replace("G",orgTask.getMarginResident());
+                BigDecimal refund = MathExpressionSolver.evaluateFormula(formulaStr);
+                orgTask.setRefundResident(refund.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                orgTask.setResidentRewards(refund.subtract(G).setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                //减去已返还保证金
+                M = M.subtract(refund);
+                orgTask.updateById();
+            }else{
+                //高绩效
+                overOrgs.add(orgTask);
+                //系数是保证金*机构指数
+                allFactor = allFactor.add(P.multiply(G));
+                overFormula = formula;
+                //减去高绩效本身的保证金才是奖励金
+                M = M.subtract(new BigDecimal(orgTask.getMarginResident()));
+            }
+        }
+        taskManage.setResidentRewards(M.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+        taskManage.updateById();
+        //遍历高绩效考核单，进行分配(最后一家机构获取剩余金额，size-1去遍历)
+        BigDecimal lastMoney = M;
+        if(overOrgs != null && overOrgs.size() > 0){
+            for (int i = 0; i < overOrgs.size()-1; i++) {
+                EvalOrgTask overOrg = overOrgs.get(i);
+                //机构指数
+                P = new BigDecimal(overOrg.getOrgRate());
+                //机构保证金
+                G = new BigDecimal(overOrg.getMarginResident());
+                //待分配系数
+                X = (P.multiply(G)).divide(allFactor,4, BigDecimal.ROUND_HALF_UP);
+                //计算返还金额
+                String overFormulaStr = overFormula.replace("G",G.toString())
+                        .replace("M",M.toString())
+                        .replace("X",X.toString())
+                        .replace("P",P.toString());
+                BigDecimal refund = BigDecimal.ZERO;
+                try{
+                    refund = MathExpressionSolver.evaluateFormula(overFormulaStr);
+                }catch (Exception e){
+                    System.out.println(overOrg.getOrgCode());
+                }
+                overOrg.setRefundResident(refund.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                overOrg.setResidentRewards(refund.subtract(G).setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                overOrg.updateById();
+                //剩下的钱
+                lastMoney = lastMoney.subtract(new BigDecimal(overOrg.getResidentRewards()));
+            }
+            //把剩下的钱全部给最后一个机构，确保奖池可以分干净 2023012-09改动
+            EvalOrgTask lastOrg = overOrgs.get(overOrgs.size()-1);
+            lastOrg.setResidentRewards(lastMoney.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+            lastOrg.setRefundResident(new BigDecimal(lastOrg.getMarginResident()).add(lastMoney).setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+            lastOrg.updateById();
+        }
+        return ResultInfo.success();
+    }
+
+    //医疗救助保证金计算
+    public ResultInfo genEarnestMoney_medical(EvalTaskManage taskManage,List<EvalOrgTask> orgTasks,List<EvalFormulaConfig> configList){
+        //定义需要进行计算的中间变量
+        //P:机构指数 M：待分配奖励金 X: 待分配系数 G:机构保证金
+        BigDecimal P,M,X,G;
+        //待分配奖励金,逐步减去低绩效返还的保证金和高绩效的保证金，剩下的就是可以分配的奖励金
+        M = new BigDecimal(taskManage.getMedSumEarnestMoney());
+        //高绩效机构集合
+        List<EvalOrgTask> overOrgs = new ArrayList<>();
+        //所有机构带分配系数和
+        BigDecimal allFactor = BigDecimal.ZERO;
+        //高绩效公式
+        String overFormula = "";
+        //遍历机构考核单，分配保证金
+        for (EvalOrgTask orgTask : orgTasks) {
+            if(BigDecimal.ZERO.compareTo(new BigDecimal(orgTask.getMarginMedical())) >= 0){
+                continue;
+            }
+            //机构指数
+            P = new BigDecimal(orgTask.getOrgRate());
+            //机构保证金
+            G = new BigDecimal(orgTask.getMarginMedical());
+            //判断是否高绩效(获取公式包含M参数，奖励金)
+            String formula = getFormula(configList,orgTask.getOrgRate());
+            if(!formula.contains("M")){
+                //正常处理
+                String formulaStr = formula.replace("P",orgTask.getOrgRate()).replace("G",orgTask.getMarginMedical());
+                BigDecimal refund = MathExpressionSolver.evaluateFormula(formulaStr);
+                orgTask.setRefundMedical(refund.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                orgTask.setMedRewards(refund.subtract(G).setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                //减去已返还保证金
+                M = M.subtract(refund);
+                orgTask.updateById();
+            }else{
+                //高绩效
+                overOrgs.add(orgTask);
+                //系数是保证金*机构指数
+                allFactor = allFactor.add(P.multiply(G));
+                overFormula = formula;
+                //减去高绩效本身的保证金才是奖励金
+                M = M.subtract(new BigDecimal(orgTask.getMarginMedical()));
+            }
+        }
+        taskManage.setMedRewards(M.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+        taskManage.updateById();
+        //遍历高绩效考核单，进行分配(最后一家机构获取剩余金额，size-1去遍历)
+        BigDecimal lastMoney = M;
+        if(overOrgs != null && overOrgs.size() > 0){
+            for (int i = 0; i < overOrgs.size()-1; i++) {
+                EvalOrgTask overOrg = overOrgs.get(i);
+                //机构指数
+                P = new BigDecimal(overOrg.getOrgRate());
+                //机构保证金
+                G = new BigDecimal(overOrg.getMarginMedical());
+                //待分配系数
+                X = (P.multiply(G)).divide(allFactor,4, BigDecimal.ROUND_HALF_UP);
+                //计算返还金额
+                String overFormulaStr = overFormula.replace("G",G.toString())
+                        .replace("M",M.toString())
+                        .replace("X",X.toString())
+                        .replace("P",P.toString());
+                BigDecimal refund = MathExpressionSolver.evaluateFormula(overFormulaStr);
+                overOrg.setRefundMedical(refund.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                overOrg.setMedRewards(refund.subtract(G).setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+                overOrg.updateById();
+                //剩下的钱
+                lastMoney = lastMoney.subtract(new BigDecimal(overOrg.getMedRewards()));
+            }
+            //把剩下的钱全部给最后一个机构，确保奖池可以分干净 2023012-09改动
+            EvalOrgTask lastOrg = overOrgs.get(overOrgs.size()-1);
+            lastOrg.setMedRewards(lastMoney.setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+            lastOrg.setRefundMedical(new BigDecimal(lastOrg.getMarginMedical()).add(lastMoney).setScale(2,BigDecimal.ROUND_HALF_UP).toString());
+            lastOrg.updateById();
+        }
+        return ResultInfo.success();
+    }
+
+    //获取该机构指数属于哪个区间，选择对应的公式
+    private String getFormula(List<EvalFormulaConfig> configs,String orgRate){
+        for (EvalFormulaConfig config : configs) {
+            if(compare(orgRate,config.getIndexBegain()) >= 0
+                    && compare(orgRate,config.getIndexEnd()) < 0){
+                return config.getFormula();
+            }
+        }
+        return "";
+    }
+
+    //比较两个字符串类型的金额大小
+    private int compare(String num1,String num2){
+        return  new BigDecimal(num1).compareTo(new BigDecimal(num2));
+    }
+
+}
+

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jsdc.ybpt.mapper.appropNotice.AppropNoticeMapper">
+    <select id="getPageByOrgCode" resultType="com.jsdc.ybpt.appropNotice.entity.AppropNotice">
+        select
+            a.ID,a.YEAR,a.MONTH,a.SEND_TIME as sendTime,a.STATUS,a.CREATE_TIME as createTime,a.IS_GENER_ANALY as isGenerAnaly,a.TCQ
+        from APPROP_NOTICE a
+        inner join APPROP_NOTICE_SEND b on a.ID = b.APPROP_NOTICE_ID
+        where
+        b.ORG_CODE = #{appropNoticePageDTO.orgCode} and a.IS_DEL = '0'
+        <if test="appropNoticePageDTO.year != null">
+            and a.YEAR = #{appropNoticePageDTO.year}
+        </if>
+        <if test="appropNoticePageDTO.month != null">
+            and a.MONTH = #{appropNoticePageDTO.month}
+        </if>
+        <if test="appropNoticePageDTO.status != null and appropNoticePageDTO.status != ''">
+            and a.status = #{appropNoticePageDTO.status}
+        </if>
+    order by a.YEAR desc,a.MONTH desc
+    </select>
+
+</mapper>
+
+

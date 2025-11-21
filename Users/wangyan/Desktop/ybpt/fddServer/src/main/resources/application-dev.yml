@@ -1,0 +1,7 @@
+sign:
+  appid: 406848
+  appkey: 0mAuvC0y8DWQMs0QsHQmTK7B
+  version: 2.0
+  host: http://test.api.fabigbig.com:8888/api/
+  return-url: http://74tumq.natappfree.cc/sign/return.do
+  notify-url: http://lqwp.natapp1.cc

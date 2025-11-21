@@ -1,0 +1,337 @@
+package com.jsdc.ybpt.service;
+
+import cn.hutool.db.DaoTemplate;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.jsdc.ybpt.base.BaseService;
+import com.jsdc.ybpt.mapper.OrgSubscribeRulesMapper;
+import com.jsdc.ybpt.model.SysUser;
+import com.jsdc.ybpt.model_check.OrgSubscribeRules;
+import com.jsdc.ybpt.util.StringUtils;
+import com.jsdc.ybpt.util.exception.CustomException;
+import com.jsdc.ybpt.vo.OrgSubscribeRulesVo;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.logging.log4j.util.Strings;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import javax.transaction.Transactional;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @Author libin
+ * @create 2022/5/26 20:20
+ */
+@Service
+@Slf4j
+public class OrgSubscribeRulesService extends BaseService<OrgSubscribeRules> {
+
+    private static final String is_book_open = "1"; //可预约
+    private static final String is_book_closed = "0";//不可预约
+
+    @Autowired
+    private SysUserService sysUserService;
+    @Autowired
+    OrgSubscribeRulesMapper orgSubscribeRulesMapper;
+
+    public synchronized void addOrgSubscribeRules(OrgSubscribeRulesVo orgSubscribeRules) {
+        SysUser sysUser = sysUserService.getUser();
+        JSONArray array = JSONArray.parseArray(orgSubscribeRules.getDateArray());
+
+//        Map<String, OrgSubscribeRules> configedList = getConfigList(); //已配置过的
+//        deleteRule();
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        LocalDate nowLocalDate = LocalDate.now();
+
+
+        Map<String, OrgSubscribeRules> map = getConfigList();
+        for (int i = 0; i < array.size(); i++) {
+            JSONObject json = (JSONObject) array.get(i);
+            String key = String.valueOf(json.get("date"));
+            //有相同日期的跳出
+            for (int j = 0; j < array.size(); j++) {
+                if (key.equals(((JSONObject) array.get(i)).get("date").toString())){
+                    continue;
+                }
+            }
+            OrgSubscribeRules osr = new OrgSubscribeRules();
+            if (map.containsKey(key)) {
+                osr = map.get(key);
+            }
+//            OrgSubscribeRules dbosr = configedList.get(key);
+//            if (null != dbosr) {
+//                osr = dbosr;
+//            }
+            osr.setTime(key);
+            osr.setLimit_person(String.valueOf(json.get("number")));
+
+            if ("0".equals(orgSubscribeRules.getState())) {
+                osr.setState("0");
+            } else {
+                osr.setState("1");
+            }
+
+            osr.setStart_time(orgSubscribeRules.getStart_time());
+            osr.setEnd_time(orgSubscribeRules.getEnd_time());
+            osr.setOrg_id(sysUser.getOrg_code());
+
+            String isBookkey = String.valueOf(json.get("grade"));
+            if ("0".equals(StringUtils.trimToEmpty(isBookkey))) {
+                osr.setIsbook(is_book_open);
+            } else {
+                osr.setIsbook(is_book_closed);
+            }
+
+            if ("".equals(StringUtils.trimToEmpty(osr.getId()))) {
+                osr.setBooking_person("0");
+                osr.insert();
+                log.info("osr=insert()============>" + JSONObject.toJSONString(osr));
+            } else {
+                String id = osr.getId();
+                // 查询出预约规则, 如果当前预约人数比vo中的人数大,则不允许修改
+                OrgSubscribeRules orgSubscribeRuleDB = this.orgSubscribeRulesMapper.selectById(id);
+                String time = orgSubscribeRuleDB.getTime();
+                LocalDate parse = null;
+                try {
+                    parse = LocalDate.parse(time, formatter);
+                } catch (Exception e) {
+                    throw new CustomException("解析页面预约时间错误, 要求格式为yyyy-MM-dd");
+                }
+
+                // 今天及今天以后的规则走这里, 以前的就随它去吧
+                if (nowLocalDate.isEqual(parse) || nowLocalDate.isBefore(parse)) {
+                    if (!StringUtils.isEmpty(osr.getBooking_person())) {
+                        if (NumberUtils.toInt(osr.getLimit_person().trim()) < NumberUtils.toInt(orgSubscribeRuleDB.getBooking_person().trim())) {
+                            throw new CustomException(osr.getTime() + " 已预约人数为:" + orgSubscribeRuleDB.getBooking_person() + ", 不可小于该数!");
+                        }
+                    }
+                    if (NumberUtils.toInt(orgSubscribeRuleDB.getBooking_person().trim()) > 0 && "0".equals(osr.getIsbook().trim())) {
+                        throw new CustomException(osr.getTime() + " 已预约人数为:" + orgSubscribeRuleDB.getBooking_person() + ", 不可设置为休息日!");
+                    }
+                }
+                osr.updateById();
+                log.info("osr=updateById()============>" + JSONObject.toJSONString(osr));
+
+            }
+
+        }
+        // orgSubscribeRules.insert();
+    }
+
+    /**
+     * 获取本机构已配置过的规则
+     *
+     * @return
+     */
+    private Map<String, OrgSubscribeRules> getConfigList() {
+        Map<String, OrgSubscribeRules> hashMap = new HashMap<>();
+        SysUser sysUser = sysUserService.getUser();
+        QueryWrapper<OrgSubscribeRules> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("org_id", sysUser.getOrg_code());
+        List<OrgSubscribeRules> rules = orgSubscribeRulesMapper.selectList(queryWrapper);
+        for (OrgSubscribeRules rule : rules) {
+            hashMap.put(rule.getTime(), rule);
+        }
+        return hashMap;
+    }
+
+    public void updateOrgSubscribeRules(OrgSubscribeRules orgSubscribeRules) {
+        orgSubscribeRules.updateById();
+    }
+
+    public Page<OrgSubscribeRules> selectList(OrgSubscribeRules orgSubscribeRules) {
+        Page<OrgSubscribeRules> page = new Page<>(orgSubscribeRules.getPageNo(), orgSubscribeRules.getPageSize());
+        LambdaQueryWrapper<OrgSubscribeRules> queryWrapper = new LambdaQueryWrapper<>();
+
+//        queryWrapper.like("name",civilworkerInfo.getName()) ;
+//        queryWrapper.eq("certno",civilworkerInfo.getCertno()) ;
+//        queryWrapper.eq("is_del","0") ;
+        queryWrapper.eq(!StringUtils.isEmpty(orgSubscribeRules.getOrg_id()),OrgSubscribeRules::getOrg_id, orgSubscribeRules.getOrg_id()).eq(!StringUtils.isEmpty(orgSubscribeRules.getTime()),OrgSubscribeRules::getTime, orgSubscribeRules.getTime());
+
+        Page<OrgSubscribeRules> orgSubscribeRulesPage = orgSubscribeRulesMapper.selectPage(page, queryWrapper);
+        return orgSubscribeRulesPage;
+    }
+
+    /**
+     * 清除已配置的规则
+     */
+    public void deleteRule() {
+        SysUser sysUser = sysUserService.getUser();
+        QueryWrapper<OrgSubscribeRules> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("org_id", sysUser.getOrg_code());
+        List<OrgSubscribeRules> rules = orgSubscribeRulesMapper.selectList(queryWrapper);
+        for (OrgSubscribeRules rule : rules) {
+            rule.deleteById();
+        }
+    }
+
+    public List<OrgSubscribeRules> getList() {
+        SysUser sysUser = sysUserService.getUser();
+        QueryWrapper<OrgSubscribeRules> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("org_id", sysUser.getOrg_code());
+        List<OrgSubscribeRules> rules = orgSubscribeRulesMapper.selectList(queryWrapper);
+        return rules;
+    }
+
+
+    public List<OrgSubscribeRules> getList(OrgSubscribeRules orgSubscribeRules) {
+        if (StringUtils.isNull(orgSubscribeRules.getOrg_id())) {
+            return null;
+        }
+        QueryWrapper<OrgSubscribeRules> queryWrapper = new QueryWrapper<>();
+        if (StringUtils.isNotEmpty(orgSubscribeRules.getOrg_id())) {
+            queryWrapper.eq("org_id", orgSubscribeRules.getOrg_id());
+        }
+        if (StringUtils.isNotEmpty(orgSubscribeRules.getIsbook())) {
+            queryWrapper.eq("isbook", orgSubscribeRules.getIsbook());
+        }
+
+        if (StringUtils.isNotEmpty(orgSubscribeRules.getState())) {
+            queryWrapper.eq("state", orgSubscribeRules.getState());
+        }
+
+        if (StringUtils.isNotEmpty(orgSubscribeRules.getRuleStartTime())) {
+            queryWrapper.ge("time", orgSubscribeRules.getRuleStartTime());
+        }
+        if (StringUtils.isNotEmpty(orgSubscribeRules.getRuleEndTime())) {
+            queryWrapper.lt("time", orgSubscribeRules.getRuleEndTime());
+        }
+
+        List<OrgSubscribeRules> rules = orgSubscribeRulesMapper.selectList(queryWrapper);
+        return rules;
+    }
+
+    public OrgSubscribeRules getEntity(OrgSubscribeRules entity) {
+        QueryWrapper<OrgSubscribeRules> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("org_id", entity.getOrg_id());
+        queryWrapper.eq("time", entity.getTime());
+        return orgSubscribeRulesMapper.selectOne(queryWrapper);
+    }
+
+    /**
+     * 获取所有机构 选择天的预约人数 防止出现bug 一天有多个规则
+     *
+     * @param entity
+     * @return
+     */
+    public List<OrgSubscribeRules> getEntityList(OrgSubscribeRules entity) {
+        QueryWrapper<OrgSubscribeRules> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("org_id", entity.getOrg_id());
+        queryWrapper.eq("time", entity.getTime());
+        queryWrapper.eq("state", 0);
+        return orgSubscribeRulesMapper.selectList(queryWrapper);
+    }
+
+
+    public List<OrgSubscribeRules> findSubRules(String id, String state) {
+        QueryWrapper<OrgSubscribeRules> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("org_id", id).eq(Strings.isNotEmpty(state), "state", state).eq("isbook", "1");
+        List<OrgSubscribeRules> rules = orgSubscribeRulesMapper.selectList(queryWrapper);
+        return rules;
+    }
+
+    public void saveOrUpdateOrgSubscribeRules(OrgSubscribeRules vo) {
+        if (StringUtils.isEmpty(vo.getId())) {
+            vo.setBooking_person("0");
+            vo.setIsbook("1");
+            vo.setOrg_id(vo.getOrg_id());
+            vo.setStart_time(vo.getTime() + " 00:00:00");
+            vo.setEnd_time(vo.getTime() + " 23:59:59");
+            this.orgSubscribeRulesMapper.insert(vo);
+        } else {
+            String id = vo.getId();
+            // 查询出预约规则, 如果当前预约人数比vo中的人数大,则不允许修改
+            OrgSubscribeRules orgSubscribeRuleDB = this.orgSubscribeRulesMapper.selectById(id);
+            if (!StringUtils.isEmpty(vo.getBooking_person())) {
+                if (Integer.parseInt(vo.getLimit_person()) < Integer.parseInt(orgSubscribeRuleDB.getBooking_person())) {
+                    throw new CustomException("当前预约人数为:" + orgSubscribeRuleDB.getBooking_person() + ", 不可小于该数!");
+                }
+
+            }
+            if (Integer.parseInt(orgSubscribeRuleDB.getBooking_person()) > 0 && "0".equals(vo.getIsbook())) {
+                throw new CustomException(orgSubscribeRuleDB.getTime() + " 已预约人数为:" + orgSubscribeRuleDB.getBooking_person() + ", 不可设置为休息日!");
+            }
+            this.orgSubscribeRulesMapper.updateById(vo);
+//            if (Integer.parseInt(orgSubscribeRuleDB.getBooking_person()) > 0 && os)
+
+        }
+
+    }
+
+    public synchronized void addSubscribeRules(OrgSubscribeRulesVo orgSubscribeRules) {
+        JSONArray array = JSONArray.parseArray(orgSubscribeRules.getDateArray());
+
+//        Map<String, OrgSubscribeRules> configedList = getConfigList(); //已配置过的
+        deleteRule1(orgSubscribeRules);
+        for (int i = 0; i < array.size(); i++) {
+            JSONObject json = (JSONObject) array.get(i);
+            String key = String.valueOf(json.get("date"));
+            OrgSubscribeRules osr = new OrgSubscribeRules();
+//            OrgSubscribeRules dbosr = configedList.get(key);
+//            if (null != dbosr) {
+//                osr = dbosr;
+//            }
+            osr.setTime(key);
+            osr.setLimit_person(String.valueOf(json.get("number")));
+            osr.setBooking_person("0");
+            if ("0".equals(orgSubscribeRules.getState())) {
+                osr.setState("0");
+            } else {
+                osr.setState("1");
+            }
+
+            osr.setStart_time(orgSubscribeRules.getStart_time());
+            osr.setEnd_time(orgSubscribeRules.getEnd_time());
+            osr.setOrg_id(orgSubscribeRules.getOrg_id());
+
+            String isBookkey = String.valueOf(json.get("grade"));
+            if ("0".equals(StringUtils.trimToEmpty(isBookkey))) {
+                osr.setIsbook(is_book_open);
+            } else {
+                osr.setIsbook(is_book_closed);
+            }
+
+            if ("".equals(StringUtils.trimToEmpty(osr.getId()))) {
+                osr.insert();
+                log.info("====api===insert=" + JSONObject.toJSONString(osr));
+            } else {
+                osr.updateById();
+                log.info("====api===update=" + JSONObject.toJSONString(osr));
+            }
+
+        }
+    }
+
+    public void deleteRule1(OrgSubscribeRulesVo orgSubscribeRules) {
+        QueryWrapper<OrgSubscribeRules> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("org_id", orgSubscribeRules.getOrg_id());
+        List<OrgSubscribeRules> rules = orgSubscribeRulesMapper.selectList(queryWrapper);
+        for (OrgSubscribeRules rule : rules) {
+            rule.deleteById();
+        }
+    }
+
+    public List<OrgSubscribeRules> mybatisOrg() {
+        QueryWrapper<OrgSubscribeRules> orgSubscribeRulesQueryWrapper = new QueryWrapper<>();
+        orgSubscribeRulesQueryWrapper.gt("limit_person", 600);
+        List<OrgSubscribeRules> orgSubscribeRules = this.orgSubscribeRulesMapper.selectList(orgSubscribeRulesQueryWrapper);
+        return orgSubscribeRules;
+    }
+
+
+    @Transactional
+    public int removeDuplicateRules() {
+        return orgSubscribeRulesMapper.deleteDuplicateRules();
+    }
+}

@@ -1,0 +1,584 @@
+package com.jsdc.ybpt.service;
+
+import cn.dev33.satoken.secure.SaSecureUtil;
+import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.IdcardUtil;
+import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.asymmetric.KeyType;
+import cn.hutool.crypto.asymmetric.RSA;
+import cn.hutool.http.HttpRequest;
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.baomidou.dynamic.datasource.annotation.DS;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.jsdc.ybpt.base.BaseService;
+import com.jsdc.ybpt.common.utils.RedisUtils;
+import com.jsdc.ybpt.mapper.SysUserMapper;
+import com.jsdc.ybpt.model.*;
+import com.jsdc.ybpt.model_check.EmployingInfo;
+import com.jsdc.ybpt.util.ListGroupUtil;
+import com.jsdc.ybpt.util.exception.CustomException;
+import com.jsdc.ybpt.vo.ResultInfo;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
+import org.springframework.util.StringUtils;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.io.Serializable;
+import java.net.URLDecoder;
+import java.util.*;
+
+/**
+ * @ClassName SysUserService
+ * @Description TODO
+ * @Author xujian
+ * @Date 2022/3/28 13:00
+ * @Version 1.0
+ */
+@Service
+public class SysUserService extends BaseService<SysUser> {
+
+    public static final String privateKey = "MIICdwIBADANBgkqhkiG9w0BAQEFAASCAmEwggJdAgEAAoGBAK78OW0O8z9wAqmAQvtgtlPp8SJQv3NaoyZDw53N0+I8x+Qmieh31JlqIovI3JExRDegh/TvPFHLLpqsAohVFR+/Vdsa4FxksU2Cyak/qAkciwB5TzXKnQqxN7iSME9bmL5SFPRPqgrGLIRROh1FsMJ4mcn5xT0XZmjxZQi2jWPlAgMBAAECgYAzUV02ErBb5mmhdDAwsMhIC8/gFHZRSj+WtUDlQrvlGZY13ueK+bmr1GiVPi8RlbU/6yB0QMUb586fJdsISIuM63GpKeGZvM56Y4i/EbCi7oNbwMpZevil4XpCcPueQ1AuthiP1W6A4HQkgdEktBt7zspBE/VPopy01EGUEOPu8QJBAOVH4FOhZAZHhcSO4GF96HTaEx8j7pRcXCZNNkHEsq6QhK6TTyNU9pOKvoSYy+d97SEqqr//kh7XUrCcyOZw5OsCQQDDYI1aCvnhvX2NtH1k2teEEi6rOtu7ocvDjGvk7njw0n5/IJm+wxEfHmBwVLlZgfO7n0lyDhPt5hjZ0T+6DeZvAkEA08jotVdGhWZbcYxoRqV+qzEkqIcQQYputBJuI6IFSqnDZV48o24/tVlbUi+xaUswVoqK3n68AjDy+KBaEkIFsQJBAIxDovdD7gWcjqjPLT7cxeCxVQPlK59XFvx6sXMXqYfq9pm6A+aqEH6wxjee+7pAy4SlZIsXhENE8A5gZUnjdM0CQEALVS/tRE8Rwwb1lesVsvpn25BydCrd7dqQ4zyswgGfN9WuJI3Vb1OrtGduBEdtkbktCqsTN6/vvWuciK5gkbE=";
+    public static final String public_key = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCu/DltDvM/cAKpgEL7YLZT6fEiUL9zWqMmQ8OdzdPiPMfkJonod9SZaiKLyNyRMUQ3oIf07zxRyy6arAKIVRUfv1XbGuBcZLFNgsmpP6gJHIsAeU81yp0KsTe4kjBPW5i+UhT0T6oKxiyEUTodRbDCeJnJ+cU9F2Zo8WUIto1j5QIDAQAB";
+
+
+    @Autowired
+    private SysUserMapper sysUserMapper;
+    @Autowired
+    private SysDictService sysDictService;
+    @Autowired
+    private SysUserRoleService sysUserRoleService;
+
+    @Autowired
+    private EmployingInfoService employingInfoService;
+
+    @Autowired
+    private FixmedinsBService fixmedinsBService;
+
+    @Autowired
+    private SysLogService sysLogService;
+
+
+    @Value("${getTokenUrl}")
+    private String getTokenUrl;
+
+    @Value("${synchronousUserUrl}")
+    private String synchronousUserUrl;
+
+
+    @DS("master")
+    public Page<SysUser> getList() {
+        Page<SysUser> page = new Page<>(1, 2);
+        return sysUserMapper.selectUserPage(page);
+    }
+
+
+    public boolean betterPwd(String pwd) {
+        String regex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[~!@#$%^&*()_+`\\-={}:\";'<>,.\\/]).{8,16}$";
+        boolean stringMatches = pwd.matches(regex);
+        return stringMatches;
+    }
+
+    public ResultInfo captcha(HttpServletRequest request) {
+        // 生成验证码并存储到redis
+        String captcha = RandomUtil.randomString(4);
+        String sessionId = request.getSession().getId();
+        RedisUtils.setBeanValue("captcha" + sessionId, captcha);
+        return ResultInfo.success(captcha);  // 返回结构化数据
+    }
+
+    /**
+     * 登录方法
+     *
+     * @param userName
+     * @param password
+     * @return
+     */
+    public ResultInfo login(String userName, String password, String cardInfo, String type) {
+
+        if ("2".equals(type) && StrUtil.isNotEmpty(cardInfo)) {//统一门户跳转
+            cardInfo = URLDecoder.decode(cardInfo);
+            //解密身份证
+            RSA rsa = new RSA(privateKey, null);
+            String cardNo = "";
+            try {
+                cardNo = rsa.decryptStr(cardInfo, KeyType.PrivateKey);
+            } catch (Exception e) {
+
+            }
+            System.out.println(cardInfo);
+            SysUser sysUser = this.getOne(new QueryWrapper<SysUser>().eq("idNumber", cardNo).eq("is_del", "0"));
+            if (sysUser != null) {
+                JSONObject token = new JSONObject();
+                StpUtil.login(sysUser.getId());
+                QueryWrapper<FixmedinsB> fixmedinsBQueryWrapper = new QueryWrapper<>();
+                fixmedinsBQueryWrapper.like("fixmedins_code", sysUser.getOrg_code());
+                List<FixmedinsB> fixmedinsBList = fixmedinsBService.list(fixmedinsBQueryWrapper);
+                if(fixmedinsBList.size()>0){
+                    FixmedinsB fixmedinsB = fixmedinsBList.get(0);
+                    sysUser.setLmtpric_hosp_lv(fixmedinsB.getLmtpric_hosp_lv());
+                    HashMap<String, String> tcqMap = new HashMap();
+                    List<SysDict> tcq = sysDictService.list(new QueryWrapper<SysDict>().eq("dict_type", "ADMDVS").eq("is_del", "0"));
+                    tcq.forEach(x -> tcqMap.put(x.getValue(), x.getLabel()));
+                    sysUser.setFix_blng_admdvs(fixmedinsB.getFix_blng_admdvs());
+                    sysUser.setFix_blng_admdvs_sbApply_name(tcqMap.get(fixmedinsB.getFix_blng_admdvs_sbApply()));
+                }
+                token.put("accessToken", StpUtil.getTokenValue());
+                token.put("user", sysUser);
+                token.put("roles", StpUtil.getRoleList());
+                token.put("update_pass", "2");
+                return ResultInfo.success(token);
+            } else {
+                return ResultInfo.error("用户名或密码错误");
+            }
+        }
+        SysLog sysLog = new SysLog();
+        sysLog.setRequestUrl("/login.do");
+        sysLog.setParams(String.format("用户名：%s,密码：%s", userName, password));
+        sysLog.setCreateTime(new Date());
+        sysLog.insert();
+
+        SysUser sysUser = this.getOne(new QueryWrapper<SysUser>().eq("userName", userName).eq("is_del", "0"));
+
+        JSONObject token = new JSONObject();
+        if (sysUser != null) {
+            if("1".equals(sysUser.getLockFlag())){
+                return ResultInfo.error("登录失败次数过多，请联系医保管理员");
+            }
+            try {
+                password = URLDecoder.decode(password, "UTF-8");
+                System.out.println("密码============:::" + password);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            Object beanValue = RedisUtils.getBeanValue(userName + "_login");
+            if (StringUtils.hasText(password) && password.equals(sysUser.getPass())) {
+                StpUtil.login(sysUser.getId());
+                QueryWrapper<FixmedinsB> fixmedinsBQueryWrapper = new QueryWrapper<>();
+                fixmedinsBQueryWrapper.like("fixmedins_code", sysUser.getOrg_code());
+                List<FixmedinsB> fixmedinsBList = fixmedinsBService.list(fixmedinsBQueryWrapper);
+                if(fixmedinsBList.size()>0){
+                    FixmedinsB fixmedinsB = fixmedinsBList.get(0);
+                    sysUser.setLmtpric_hosp_lv(fixmedinsB.getLmtpric_hosp_lv());
+                    HashMap<String, String> tcqMap = new HashMap();
+                    List<SysDict> tcq = sysDictService.list(new QueryWrapper<SysDict>().eq("dict_type", "ADMDVS").eq("is_del", "0"));
+                    tcq.forEach(x -> tcqMap.put(x.getValue(), x.getLabel()));
+                    sysUser.setFix_blng_admdvs(fixmedinsB.getFix_blng_admdvs());
+                    sysUser.setFix_blng_admdvs_sbApply_name(tcqMap.get(fixmedinsB.getFix_blng_admdvs_sbApply()));
+                }
+                token.put("accessToken", StpUtil.getTokenValue());
+                token.put("user", sysUser);
+                token.put("roles", StpUtil.getRoleList());
+                token.put("update_pass", betterPwd(password) ? "2" : "1");
+                if(beanValue != null){
+                    RedisUtils.deleteKey(userName + "_login");
+                }
+                return ResultInfo.success(token);
+            } else {
+                //5次失败锁定账号
+                if(beanValue == null){
+                    RedisUtils.setBeanValue(userName + "_login","0");
+                }else{
+                    Integer count = Integer.parseInt(beanValue+"");
+                    count ++;
+                    if(count >= 5){
+                        sysUser.setLockFlag("1");
+                        sysUser.updateById();
+                        RedisUtils.deleteKey(userName + "_login");
+                        return ResultInfo.error("登录失败次数过多，请联系医保管理员");
+                    }
+                    RedisUtils.setBeanValue(userName + "_login",count);
+                }
+                return ResultInfo.error("用户名或密码错误");
+            }
+        } else {
+            return ResultInfo.error("用户名或密码错误");
+        }
+    }
+
+    /**
+     * 获取用户
+     *
+     * @return
+     */
+    public SysUser getUser() {
+        if (StpUtil.getLoginId() != null) {
+            return this.getById((Serializable) StpUtil.getLoginId());
+        }
+        return null;
+    }
+
+    /**
+     * 登出
+     */
+    public void logout() {
+        StpUtil.logout();
+    }
+
+
+    /**
+     * 新增用户
+     *
+     * @param sysUser
+     * @return
+     */
+    public ResultInfo saveUser(SysUser sysUser) {
+        SysUser currUser = getUser();
+        if(StrUtil.isEmpty(sysUser.getIdNumber()) || !IdcardUtil.isValidCard(sysUser.getIdNumber())){
+            throw new CustomException("身份证号验证失败！");
+        }
+        boolean check = this.checkOnly(sysUser);
+        if (!check) {
+            throw new CustomException("身份证号码已存在！");
+        }
+
+        if("1".equals(sysUser.getIsAdmin())){
+            boolean checkAdmin =  checkOnlyAdmin(sysUser) ;
+            if (!checkAdmin) {
+                return ResultInfo.error("该机构已存在管理员账号！");
+            }
+        }
+
+        if (StringUtils.hasText(sysUser.getId())) {
+            //加密
+            if (!sysUser.getPass().equals(sysUserMapper.selectById(sysUser.getId()).getPass())) {
+                sysUser.setPass(SaSecureUtil.md5(sysUser.getPass()));
+            }
+            //修改
+            sysUser.setUpdateUser(currUser.getId());
+            sysUser.setUpdateTime(new Date());
+            //删除老角色
+            sysUserRoleService.remove(new QueryWrapper<SysUserRole>().eq("user_id", sysUser.getId()));
+        } else {
+            //判断用户名是否重复
+            List<SysUser> list = this.list(new QueryWrapper<SysUser>().eq("username", sysUser.getUsername()).eq("is_del", "0"));
+            if (list != null && list.size() > 0) {
+                return ResultInfo.error("登录账号重复！");
+            }
+
+
+            //加密
+            sysUser.setPass(SaSecureUtil.md5(sysUser.getPass()));
+            //新增
+            sysUser.setId(IdUtil.simpleUUID());
+
+            sysUser.setCreateUser(currUser.getId());
+            sysUser.setCreateTime(new Date());
+        }
+
+        //新增用户角色关联数据
+        for (String roleId : sysUser.getRoleIds()) {
+            SysUserRole sysUserRole = new SysUserRole();
+            sysUserRole.setId(IdUtil.simpleUUID());
+            sysUserRole.setRole_id(roleId);
+            sysUserRole.setUser_id(sysUser.getId());
+            sysUserRole.insert();
+        }
+
+        sysUser.setIs_del("0");
+        sysUser.setSynchronousState("0");
+        sysUser.insertOrUpdate();
+        return ResultInfo.success();
+    }
+
+
+    /**
+     * 修改身份证号码
+     * @author wzn
+     * @date 2024/6/4 14:45
+     */
+    public ResultInfo updateCert(SysUser sysUser) {
+        SysUser currUser = getUser();
+        boolean check = this.checkOnly(sysUser);
+        if (!check) {
+            throw new CustomException("身份证号码已存在！");
+        }
+        if(StringUtils.isEmpty(sysUser.getIdNumber()) || !IdcardUtil.isValidCard(sysUser.getIdNumber())){
+            throw new CustomException("身份证号码校验失败！");
+        }
+
+        sysUser.updateById();
+        return ResultInfo.success();
+    }
+
+
+    //身份证号码唯一性校验
+    public boolean checkOnly(SysUser sysUser) {
+        boolean checkOnly = true; //没有重复
+        QueryWrapper<SysUser> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("idNumber", sysUser.getIdNumber());
+        List<SysUser> sysUserList = sysUserMapper.selectList(queryWrapper);
+        if (CollectionUtils.isNotEmpty(sysUserList)) {
+            checkOnly = false;
+            if (null != sysUser.getId()) {
+                if (sysUser.getId().equals(sysUserList.get(0).getId())) {
+                    checkOnly = true;
+                }
+            }
+        }
+        return checkOnly;
+    }
+
+    //机构/药店账号判断是否已存在管理员
+    public boolean checkOnlyAdmin(SysUser sysUser) {
+        boolean checkOnly = true; //没有重复
+        QueryWrapper<SysUser> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("org_code", sysUser.getOrg_code());
+        queryWrapper.eq("isAdmin", "1");
+        List<SysUser> sysUserList = sysUserMapper.selectList(queryWrapper);
+        if (CollectionUtils.isNotEmpty(sysUserList)) {
+            checkOnly = false;
+            if (null != sysUser.getId()) {
+                if (sysUser.getId().equals(sysUserList.get(0).getId())) {
+                    checkOnly = true;
+                }
+            }
+        }
+        return checkOnly;
+    }
+
+
+    public ResultInfo getDetail(String mac, String cdKey) {
+        QueryWrapper qw = new QueryWrapper();
+        qw.eq("mac", mac);
+        qw.eq("cdkey", cdKey);
+        qw.ge("endDate", DateUtil.formatDate(new Date()));
+        qw.le("beginDate", DateUtil.formatDate(new Date()));
+        qw.eq("is_auth", "1");
+        SysUser sysUser = (SysUser) this.sysUserMapper.selectOne(qw);
+        return sysUser != null ? ResultInfo.success() : ResultInfo.error("该授权已经失效，请联系管理员");
+    }
+
+    public ResultInfo activeCode(String mac, String cdKey) {
+        QueryWrapper qw = new QueryWrapper();
+        qw.eq("mac", mac);
+//        qw.eq("cdkey", cdKey);
+        SysUser sysUser = (SysUser) this.sysUserMapper.selectOne(qw);
+        if (null == sysUser) {
+            return ResultInfo.error("未知的用户！");
+        }
+        QueryWrapper qw2 = new QueryWrapper();
+        qw2.eq("mac", mac);
+        qw.eq("cdkey", cdKey);
+        SysUser sysUser2 = (SysUser) this.sysUserMapper.selectOne(qw2);
+        if (sysUser2 != null) {
+            if ("1".equals(sysUser2.getIs_auth())) {
+                return ResultInfo.error("该激活码已经被绑定！");
+            } else {
+                sysUser2.setIs_auth("1");
+                sysUser2.updateById();
+                return ResultInfo.success();
+            }
+        } else {
+            return ResultInfo.error("激活码有误！");
+        }
+    }
+
+    public ResultInfo pass(SysUser sysUser) {
+        SysUser currUser = getUser();
+        if (!currUser.getPass().equals(SaSecureUtil.md5(sysUser.getTempPass()))) {
+            return ResultInfo.error("旧密码输入错误，请重新输入！");
+        }
+        sysUser.setPass(sysUser.getPass());
+        sysUser.setUpdateTime(new Date());
+        sysUser.updateById();
+        return ResultInfo.success();
+    }
+
+
+    /**
+     * 用人单位批量生成账号
+     * Author wzn
+     * Date 2022/6/21 17:27
+     */
+    public void bulkRegistration() {
+//        List<EmployingInfo> employingInfos = employingInfoService.getAllEmploying2() ;
+//        List<EmployingInfo> employingInfos = employingInfoService.otherSelect() ;
+        List<FixmedinsB> fixmedinsBS = fixmedinsBService.pldr();
+        SysUser sysUser = null;
+        SysUserRole sysUserRole = null;
+        SysRoleMenu sysRoleMenu = null;
+        for (FixmedinsB f : fixmedinsBS) {
+            //往用户表新增数据
+            sysUser = new SysUser();
+            QueryWrapper<SysUser> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("org_code", f.getFixmedins_code());
+            SysUser sysUser1 = sysUserMapper.selectOne(queryWrapper);
+            if (null == sysUser1) {
+//                String loginName = e.getEmp_no().substring(e.getEmp_no().length() - 8) ;
+                sysUser.setUsername(f.getFixmedins_code());
+                String md5Password = DigestUtils.md5DigestAsHex("123456".getBytes());
+                sysUser.setPass(md5Password);
+                sysUser.setName(f.getFixmedins_name());
+                sysUser.setUser_type("3");
+                sysUser.setOrg_code(f.getFixmedins_code());
+                sysUser.setOrg_name(f.getFixmedins_name());
+                sysUser.setCreateUser("20220715");
+                sysUser.setIs_del("0");
+                sysUser.insert();
+                //userRole
+                sysUserRole = new SysUserRole();
+                sysUserRole.setUser_id(sysUser.getId());
+                sysUserRole.setRole_id("fb2a7a2d63e0453ab1e23e01e1822e39");
+                sysUserRole.insert();
+            }
+
+        }
+    }
+
+    /**
+     * 获取用人单位（底下没有公务员的）
+     * Author wzn
+     * Date 2022/6/30 15:27
+     */
+    public void getEmplof() {
+        List<EmployingInfo> employingInfos = employingInfoService.otherSelect();
+        for (EmployingInfo e : employingInfos) {
+            employingInfoService.addEmployingInfo(e);
+
+        }
+
+    }
+
+
+    public SysUser getUserInfo(String fixmedins_code) {
+        QueryWrapper queryWrapper = new QueryWrapper();
+        queryWrapper.eq("org_code", fixmedins_code);
+        return sysUserMapper.selectOne(queryWrapper);
+    }
+
+    public Page<SysUser> selectByPage(Page page, SysUser user) {
+        return sysUserMapper.selectByPage(page, user);
+    }
+
+
+    public ResultInfo validCarNo(){
+        List<SysUser> errorList = new ArrayList<>();
+        //查询用户
+        QueryWrapper<SysUser> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("is_del", "0");
+        queryWrapper.isNotNull("idNumber");
+        List<SysUser> userList = sysUserMapper.selectList(queryWrapper);
+        for (SysUser sysUser : userList) {
+            if(!IdcardUtil.isValidCard(sysUser.getIdNumber())){
+                errorList.add(sysUser);
+                sysUser.setIdNumber("xujian");
+                sysUser.updateById();
+            }
+        }
+        return ResultInfo.success(errorList);
+    }
+
+    /**
+     * 医保统一门户同步接口
+     * Author wzn
+     * Date 2023/3/21 17:06
+     */
+    public ResultInfo synchronization() {
+        //先登录获取token
+        String json = "{\"appId\": \"25\", " +
+                "\"publicKey\": \"" + public_key + "\", " +
+                "\"privateKey\": \"" + privateKey + "\"" +
+                "}";
+        System.out.println(json);
+        String res = HttpRequest.post(getTokenUrl).contentType("application/json").body(json).timeout(10000).execute().body();
+        System.out.println(res);
+        JSONObject object = JSONObject.parseObject(res);
+        Integer code = object.getInteger("code");
+        if (code != 200) {
+            return ResultInfo.error("医保统一门户服务异常,请联系管理员！");
+//            throw new CustomException();
+        } else {
+            //获取token
+            String data = object.getString("data");
+            //调用统一门户同步
+            //查询用户
+            QueryWrapper<SysUser> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("is_del", "0");
+            queryWrapper.and(wrapper -> wrapper.eq("synchronousState", "0").or().isNull("synchronousState"));
+            queryWrapper.isNotNull("idNumber");
+            List<Map<String, String>> mapList = new ArrayList<>();
+            Map<String, String> map = null;
+            //操作类型新增
+            List<SysUser> sysUserList = sysUserMapper.selectList(queryWrapper);
+
+
+            for (SysUser s : sysUserList) {
+                map = new HashMap<>();
+                map.put("biz_id", s.getId());
+                map.put("loginName", s.getUsername());
+                map.put("card_no", s.getIdNumber());
+                map.put("phone", s.getTelephone());
+                map.put("operateType", "1");
+                mapList.add(map);
+            }
+            QueryWrapper<SysUser> queryWrapper2 = new QueryWrapper<>();
+            queryWrapper2.eq("is_del", "1");
+            queryWrapper2.and(wrapper -> wrapper.eq("synchronousState", "0").or().isNull("synchronousState"));
+
+            queryWrapper2.isNotNull("idNumber");
+            //操作类型删除
+            List<SysUser> sysUsers = sysUserMapper.selectList(queryWrapper2);
+            for (SysUser s : sysUsers) {
+                map = new HashMap<>();
+                map.put("biz_id", s.getId());
+                map.put("loginName", s.getUsername());
+                map.put("card_no", s.getIdNumber());
+                map.put("phone", s.getTelephone());
+                map.put("operateType", "2");
+                mapList.add(map);
+            }
+            if (mapList.size() > 0) {
+                List<List<Map<String, String>>> lists = ListGroupUtil.groupListByQuantity(mapList, 500);
+                for (int i = 0; i < lists.size(); i++) {
+
+                    String jsonString = JSON.toJSONString(lists.get(i));
+                    System.out.println(jsonString);
+                    String res2 = HttpRequest.post(synchronousUserUrl).header("accessToken", data).contentType("application/json").body(jsonString).timeout(100000).execute().body();
+                    System.out.println(res2);
+                    JSONObject object2 = JSONObject.parseObject(res2);
+                    Integer code2 = object2.getInteger("code");
+                    String msg = object2.getString("msg");
+                    if (code2 != 200) {
+                        return ResultInfo.error(msg);
+                    } else {
+                        //更改变更状态
+                        for (Map<String, String> m : lists.get(i)) {
+
+                            QueryWrapper<SysUser> queryWrapper1 = new QueryWrapper<>();
+                            queryWrapper1.eq("username", m.get("loginName"));
+                            SysUser sysUser = new SysUser();
+                            sysUser.setSynchronousState("1");
+                            sysUserMapper.update(sysUser, queryWrapper1);
+                        }
+
+
+                    }
+                }
+
+            }
+
+        }
+        return ResultInfo.success();
+    }
+
+    public static void main(String[] args) {
+        //解密身份证
+        RSA rsa = new RSA(privateKey, null);
+        String cardNo = "";
+        try {
+            cardNo = rsa.decryptStr("ajFmumC+F/G1aebMm+tN8RO9Yjl3fj0UoP58i7PjK5g8YVUllkursSP5ol+5OSCk4mthpb+NgN2vyCBLrVHEbmRFKjrzY+FioC6jYhR7AHC2yp6lLwdRXo4/darACtxtR6ZAxXcO955gACGNJv75c1wQxkeINbMe3B+IfI7hk/U=", KeyType.PrivateKey);
+        } catch (Exception e) {
+
+        }
+    }
+}

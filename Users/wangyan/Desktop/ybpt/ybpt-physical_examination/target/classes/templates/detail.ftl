@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport"
+        content="user-scalable=0,width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no,target-densitydpi=high-dpi" />
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache">
+    <title>主页</title>
+    <meta name="keywords" content="主页" />
+    <meta name="description" content="主页" />
+    <link rel="stylesheet" href="/civil/lib/fonts/iconfont.css">
+    <link rel="stylesheet" href="/civil/lib/css/css.css">
+    <script src="/civil/lib/js/jquery-3.6.0.min.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/civil/lib/js/main.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/civil/lib/js/vcs.js" type="text/javascript" charset="utf-8"></script>
+</head>
+
+<body>
+    <div class="wrap userCenter">
+        <header class="header headerwhitebg">
+            <div class="topbar">
+                <span class="btn-left"><i class="iconfont icon-back"></i></span>
+                <div class="words ellipsis">预约详情</div>
+                <span class="btn-right"><i class="iconfont icon-zhuye6"></i></span>
+            </div>
+        </header>
+        <div class="contWrap">
+            <ul class="tab-box orderlist orderdetail active">
+                <li>
+                    <div class="row1">
+                        <div class="ordernum"><span class="iconfont icon-dingdan5"></span><span>基本信息</span>
+                        </div>
+                        <div class="state green">已预约</div>
+                    </div>
+                    <div class="row2">
+                        <div class="item-row">
+                            <span class="p1">套餐年份：</span>
+                            <span class="p2">12345612465</span>
+                        </div>
+                        <div class="item-row">
+                            <span class="p1">套餐金额：</span>
+                            <span class="p2">F6556</span>
+                        </div>
+                        <div class="item-row">
+                            <span class="p1">预约时间：</span>
+                            <span class="p2">F6556</span>
+                        </div>               
+                    </div>
+                  
+                    <div class="row4">
+                        <div class="btns">查看报告</div>         
+                                           
+                    </div>               
+
+                </li>
+            </ul>
+
+        </div>
+        <div class="bottom">
+			<div class="submit">撤消预约</div>
+		</div>
+      
+    </div>
+
+</body>
+
+</html>

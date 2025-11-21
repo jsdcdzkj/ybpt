@@ -1,0 +1,7 @@
+sign:
+  appid: 502087
+  appkey: YczBLJg1VV1zxREItsqdTue4
+  version: 2.0
+  host: https://textapi.fadada.com/api2/
+  return-url: http://74tumq.natappfree.cc/sign/return.do
+  notify-url: https://tj.xzybzx.org.cn:8888/web

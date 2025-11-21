@@ -1,0 +1,25 @@
+# Created at 2024-06-04T10:08:11.738
+TestSet has not finished before stream error has appeared >> initializing exit by non-null configuration: null
+java.io.EOFException
+	at java.io.DataInputStream.readInt(DataInputStream.java:392)
+	at org.apache.maven.surefire.booter.MasterProcessCommand.decode(MasterProcessCommand.java:115)
+	at org.apache.maven.surefire.booter.CommandReader$CommandRunnable.run(CommandReader.java:391)
+	at java.lang.Thread.run(Thread.java:745)
+
+
+# Created at 2024-06-04T10:08:12.079
+Unexpected IOException with stream: 2024-06-04 10:08:12.078  INFO 13096 --- [           main] c.j.fddserver.FddServerApplicationTests  : Started FddServerApplicationTests in 1.138 seconds (JVM running for 1.696)
+
+
+# Created at 2024-06-04T10:08:12.101
+Unexpected IOException: 5,1,com.jsdc.fddserver.FddServerApplicationTests,contextLoads,null,null,null
+
+
+# Created at 2024-06-04T10:08:12.259
+Unexpected IOException: 6,1,com.jsdc.fddserver.FddServerApplicationTests,contextLoads,null,null,null
+
+
+# Created at 2024-06-04T10:08:12.260
+Unexpected IOException: 2,1,org.apache.maven.surefire.junitplatform.JUnitPlatformProvider,com.jsdc.fddserver.FddServerApplicationTests,null,null,null
+
+

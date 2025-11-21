@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jsdc.ybpt.mapper.formula.FixedAssetsDepreMapper">
+
+    <select id="selectDataList" resultType="com.jsdc.ybpt.formula.domain.entity.FixedAssetsDepre">
+        select
+            t1.ID,
+            t1.PRICE_CALCULATE_ID,
+            t1.DEVICE_NAME,
+            t1.ORIGINAL_VALUE,
+            t1.USE_LIFE,
+            t1.USE_TIME,
+            t1.PAY_PRICE,
+            t1.IS_DEL,
+            t1.CREATETIME,
+            t1.CREATEUSER,
+            t1.UPDATETIME,
+            t1.UPDATEUSER,
+            t1.IS_SUBTOTAL
+
+        from FORMULA_FIXED_ASSETS_DEPRE t1
+        <where>
+      
+            <if test="id != null and id != ''">
+                and t1.ID = #{id}
+            </if>
+            <if test="priceCalculateId != null and priceCalculateId != ''">
+                and t1.PRICE_CALCULATE_ID = #{priceCalculateId}
+            </if>
+            <if test="deviceName != null and deviceName != ''">
+                and t1.DEVICE_NAME = #{deviceName}
+            </if>
+            <if test="originalValue != null">
+                and t1.ORIGINAL_VALUE = #{originalValue}
+            </if>
+            <if test="useLife != null">
+                and t1.USE_LIFE = #{useLife}
+            </if>
+            <if test="useTime != null">
+                and t1.USE_TIME = #{useTime}
+            </if>
+            <if test="payPrice != null">
+                and t1.PAY_PRICE = #{payPrice}
+            </if>
+            <if test="isDel != null and isDel != ''">
+                and t1.IS_DEL = #{isDel}
+            </if>
+            <if test="createtime != null">
+                and t1.CREATETIME = #{createtime}
+            </if>
+            <if test="createuser != null and createuser != ''">
+                and t1.CREATEUSER = #{createuser}
+            </if>
+            <if test="updatetime != null">
+                and t1.UPDATETIME = #{updatetime}
+            </if>
+            <if test="updateuser != null and updateuser != ''">
+                and t1.UPDATEUSER = #{updateuser}
+            </if>
+            <if test="isSubtotal != null and isSubtotal != ''">
+                and t1.IS_SUBTOTAL = #{isSubtotal}
+            </if>
+        </where>
+    </select>
+    
+    
+    <select id="pageByDTO" resultType="com.jsdc.ybpt.formula.domain.entity.FixedAssetsDepre"
+        parameterType="com.jsdc.ybpt.formula.domain.dto.FixedAssetsDepreDTO">
+        select
+            t1.ID,
+            t1.PRICE_CALCULATE_ID,
+            t1.DEVICE_NAME,
+            t1.ORIGINAL_VALUE,
+            t1.USE_LIFE,
+            t1.USE_TIME,
+            t1.PAY_PRICE,
+            t1.IS_DEL,
+            t1.CREATETIME,
+            t1.CREATEUSER,
+            t1.UPDATETIME,
+            t1.UPDATEUSER,
+            t1.IS_SUBTOTAL
+
+        from FORMULA_FIXED_ASSETS_DEPRE t1
+        <where>
+        </where>
+        
+    </select>
+    
+    
+    
+    <select id="getVOById" resultType="com.jsdc.ybpt.formula.domain.entity.FixedAssetsDepre"
+        parameterType="int">
+        select
+            t1.ID,
+            t1.PRICE_CALCULATE_ID,
+            t1.DEVICE_NAME,
+            t1.ORIGINAL_VALUE,
+            t1.USE_LIFE,
+            t1.USE_TIME,
+            t1.PAY_PRICE,
+            t1.IS_DEL,
+            t1.CREATETIME,
+            t1.CREATEUSER,
+            t1.UPDATETIME,
+            t1.UPDATEUSER,
+            t1.IS_SUBTOTAL
+
+        from FORMULA_FIXED_ASSETS_DEPRE t1
+        <where>
+
+            and t1.ID = #{id}
+            
+       
+        </where>
+        
+    </select>
+    
+    
+</mapper>
+
+

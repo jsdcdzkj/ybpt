@@ -1,0 +1,132 @@
+import { baseURL_civil } from '@/config';
+import request from '@/utils/request_civil';
+import axios from "axios";
+export function count() {
+  return request({
+    url: '/civi/count',
+    method: 'post',
+  })
+}
+
+export function backOutByAdmin(data) {
+  return request({
+    url: '/personSubRecord/backOutByAdmin',
+    method: 'post',
+    data,
+  })
+}
+
+export function yyselectList(data) {
+  return request({
+    url: '/civi/yyselectList',
+    method: 'post',
+    data,
+  })
+}
+
+export function settlementMore(data) {
+  return request({
+    url: '/personSubRecord/settlementMore',
+    method: 'post',
+    data,
+  })
+}
+
+export function noAppointment(data) {
+  return request({
+    url: '/civi/noAppointment',
+    method: 'post',
+    data,
+  })
+}
+
+export function yyExport(data) {
+  return request({
+    url: '/civi/yyExport',
+    method: 'post',
+    data,
+    responseType: 'blob'
+  })
+}
+
+
+
+export function findPersonSubscribeRecord(data) {
+  console.log(data)
+  return request({
+    url: '/personSubRecord/findPersonSubscribeRecord',
+    method: 'post',
+    params: {
+      pageNo: data.pageNo,
+      pageSize: data.pageSize,
+      oname: data.oname,
+      pname: data.pname
+    }
+  })
+}
+
+
+export function findCiviWorkerByRid(data) {
+  return request({
+    url: '/personSubRecord/findCiviWorkerByRid',
+    method: 'post',
+    params: {
+      rid: data.rid,
+      oid: data.oid,
+      time: data.time,
+      code: data.code,
+    }
+  })
+}
+
+
+export function findItemToMealByPid(data) {
+  return request({
+    url: '/personSubRecord/findItemToMealByPid',
+    method: 'get',
+    params: {
+      pid: data
+    }
+  })
+}
+
+export function conformById(data) {
+
+  return request({
+    url: '/personSubRecord/conformById',
+    method: 'post',
+    params: {
+      id: data.id
+    }
+  })
+}
+
+export function jsConfirm(data) {
+
+  return request({
+    url: '/personSubRecord/jsConfirm',
+    method: 'post',
+    params: {
+      id: data.id
+    }
+  })
+}
+
+//上传文件
+
+let urlUpload = baseURL_civil + "personSubRecord/upload";
+
+export async function uploadFile(form) {
+  var result = {};
+  if (null != form.get("file") && "" != form.get("file") && undefined != form.get("file")) {
+      await axios.post(urlUpload, form, {
+      headers: {
+        "Content-Type": "multipart/form-data", "accessToken": localStorage.getItem("accessToken")
+      }
+    }).then((res) => {
+        result = res;
+        console.info(res);
+    });
+  }
+  return result;
+}

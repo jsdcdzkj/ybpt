@@ -1,0 +1,407 @@
+package com.jsdc.ybpt.controller;
+
+import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.lang.Console;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.poi.excel.BigExcelWriter;
+import cn.hutool.poi.excel.ExcelUtil;
+import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.jsdc.ybpt.abnormal.SettleAbnormal;
+import com.jsdc.ybpt.agreementsignModel.NetTagRegister;
+import com.jsdc.ybpt.capitalSettlement.QsInfo;
+import com.jsdc.ybpt.capitalSettlement.QsInfoDetails;
+import com.jsdc.ybpt.capitalSettlement.QsOrgConfirmation;
+import com.jsdc.ybpt.mapper.QsInfoDetailsMapper;
+import com.jsdc.ybpt.mapper.QsInfoMapper;
+import com.jsdc.ybpt.model.FileInfo;
+import com.jsdc.ybpt.model.SysDict;
+import com.jsdc.ybpt.model.SysUser;
+import com.jsdc.ybpt.model_check.AdministrativeUnit;
+import com.jsdc.ybpt.service.*;
+import com.jsdc.ybpt.service.agreementsignService.NetTagRegisterService;
+import com.jsdc.ybpt.service.agreementsignService.SignService;
+import com.jsdc.ybpt.util.DocUtil;
+import com.jsdc.ybpt.util.FastDfs.FastDfsParams;
+import com.jsdc.ybpt.util.FastDfs.FastDfsUtil;
+import com.jsdc.ybpt.util.StringUtils;
+import com.jsdc.ybpt.vo.ResultInfo;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.http.entity.ContentType;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.util.ResourceUtils;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletResponse;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * 清算确认
+ */
+@RestController
+@RequestMapping("/liquidation")
+@Slf4j
+public class LiquidationController {
+
+    @Autowired
+    private FastDfsUtil fastDfsUtil;
+    @Autowired
+    private SysDictService sysDictService;
+    @Autowired
+    QsInfoDetailsMapper qsInfoDetailsMapper;
+    @Autowired
+    QsOrgConfirmationService qsOrgConfirmationService;
+    @Autowired
+    private SignService signService;
+    @Autowired
+    private NetTagRegisterService registerService;
+    @Autowired
+    private SysUserService sysUserService;
+    @Autowired
+    private FileInfoService fileInfoService;
+    @Autowired
+    private AdministrativeUnitService administrativeUnitService;
+    @Autowired
+    private SysFileService sysFileService;
+    @Autowired
+    private QsInfoMapper qsInfoMapper;
+
+    /**
+     * 查看PDf
+     */
+    @RequestMapping("/viewPdf")
+    public ResultInfo viewPdf(String id) {
+        //获取模板文档
+        File rootFile = null;
+        try {
+            rootFile = new File(ResourceUtils.getURL("classpath:").getPath());
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        File templateFile = new File(rootFile, "/templates/清算确认书模板_V2.docx");
+        String docxPath = rootFile + "/TEMP/" + IdUtil.simpleUUID() + ".docx";
+        String pdfFileName = IdUtil.simpleUUID() + ".pdf";
+        String pdfPath = rootFile + "/TEMP/" + pdfFileName;
+        QsOrgConfirmation qs = qsOrgConfirmationService.getById(id);
+        qs.setOrg_sign_time(DateUtil.format(new Date(),"yyyy年MM月dd日"));
+        qs.setCentre_sign_time(DateUtil.format(new Date(),"yyyy年MM月dd日"));
+        qs.setOrg_name(qs.getOrg_name().trim().replaceAll("\\r?\\n", ""));
+        AdministrativeUnit administrativeUnit = administrativeUnitService.getOne(Wrappers.<AdministrativeUnit>lambdaQuery()
+                .eq(AdministrativeUnit::getEmp_no,qs.getAdmdvs())
+                .eq(AdministrativeUnit::getIs_del,"0")
+        );
+        QueryWrapper<QsInfo> queryWrapper = new QueryWrapper<>() ;
+        queryWrapper.eq("is_del","0") ;
+        queryWrapper.eq("admdvs",qs.getAdmdvs()) ;
+        queryWrapper.eq("year",qs.getYear()) ;
+        QsInfo qsInfo = qsInfoMapper.selectOne(queryWrapper) ;
+        List<QsInfoDetails> details = qsInfoDetailsMapper.selectList(Wrappers.<QsInfoDetails>lambdaQuery()
+                .eq(QsInfoDetails::getQs_info_id, qsInfo.getId())
+                .eq(QsInfoDetails::getAdmdvs, qs.getAdmdvs())
+                .eq(QsInfoDetails::getOrg_code, qs.getOrg_code())
+                .eq(QsInfoDetails::getYear, qs.getYear()));
+        qs.setAdmdvs(administrativeUnit.getEmp_name());
+        Map<String, Object> data = JSONObject.parseObject(JSONObject.toJSONString(qs), Map.class);
+        Map<String, QsInfoDetails> detailsMap = details.stream().collect(Collectors.toMap(QsInfoDetails::getType, Function.identity(), (key1, key2) -> key2));
+        for (int i = 0; i < 10; i++) {
+            QsInfoDetails qsInfoDetails = detailsMap.get(String.valueOf(i));
+            if (qsInfoDetails == null) {
+                qsInfoDetails = new QsInfoDetails();
+            }
+            data.put("withhold_payment" + i, qsInfoDetails.getWithhold_payment());
+            data.put("payable_amount" + i, qsInfoDetails.getPayable_amount());
+            data.put("paid_amount" + i, qsInfoDetails.getPaid_amount());
+            data.put("payment_amont" + i, qsInfoDetails.getPayment_amont());
+            data.put("org_borne_amount" + i, qsInfoDetails.getOrg_borne_amount());
+            data.put("sum_amount" + i, qsInfoDetails.getSum_amount());
+            data.put("budget_amount" + i, qsInfoDetails.getBudget_amount());
+        }
+        try {
+            Console.log(data);
+            DocUtil.word2RedDocument(templateFile.getPath(), data, docxPath, pdfPath);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        //上传文件服务器
+        File docFile = null;
+        File pdfFile = null;
+        MultipartFile multipartFile = null;
+        FastDfsParams params = null;
+        try {
+            docFile = new File(docxPath);
+            pdfFile = new File(pdfPath);
+            //删除文件
+            List<FileInfo> fileInfos = fileInfoService.list(new QueryWrapper<FileInfo>().eq("bizType","3").eq("bizId",id));
+            for (FileInfo fileInfo : fileInfos) {
+                fastDfsUtil.deleteFile(fileInfo);
+            }
+            multipartFile = new MockMultipartFile(pdfFile.getName(), pdfFile.getName(), ContentType.APPLICATION_OCTET_STREAM.toString(), new FileInputStream(pdfFile));
+            params = new FastDfsParams("liquidation", multipartFile, "3", id);
+            params.setFileName(pdfFileName);
+            return fastDfsUtil.uploadFile(params);
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            docFile.delete();
+            pdfFile.delete();
+        }
+        return ResultInfo.success();
+    }
+
+    /**
+     * 清算确认列表
+     */
+    @RequestMapping("/getList")
+    public ResultInfo getList(@RequestBody QsOrgConfirmation qsOrgConfirmation) {
+        Page<QsOrgConfirmation> page = qsOrgConfirmationService.getList(qsOrgConfirmation);
+        List<SysDict> sysDictList = sysDictService.list(Wrappers.<SysDict>lambdaQuery()
+                .eq(SysDict::getDict_type,"admdvs-area")
+                .eq(SysDict::getIs_del,"0"));
+        Map<String, SysDict> detailsMap = sysDictList.stream().collect(Collectors.toMap(SysDict::getValue, Function.identity(), (key1, key2) -> key2));
+        if (null != page && page.getRecords().size() > 0) {
+            for (QsOrgConfirmation q : page.getRecords()) {
+                if (StringUtils.isNotEmpty(q.getAdmdvs())) {
+                    q.setAdmdvs(detailsMap.get(q.getAdmdvs()).getLabel());
+                }
+
+            }
+        }
+        return ResultInfo.success(page);
+    }
+
+    @RequestMapping("/aaa")
+    public void sing(){
+        List<QsOrgConfirmation> list = qsOrgConfirmationService.list(Wrappers.<QsOrgConfirmation>lambdaQuery()
+                .eq(QsOrgConfirmation::getYear,"2023")
+                .eq(QsOrgConfirmation::getStatus,"3")
+        );
+        for (int i = 0; i < list.size(); i++) {
+
+
+            QsOrgConfirmation q = list.get(i);
+            viewPdf(q.getId());
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            List<FileInfo> fileInfos = fileInfoService.list(Wrappers.<FileInfo>lambdaQuery()
+                    .eq(FileInfo::getBizId,q.getId())
+            );
+            if(fileInfos != null && !fileInfos.isEmpty()){
+                FileInfo fileInfo = fileInfos.get(fileInfos.size() - 1);
+                log.info(list.get(i).getOrg_code());
+                log.info(fileInfo.getFileUrl());
+                log.info(q.getId());
+                log.info("========================");
+                this.signConfirmation2(q.getId(),fileInfo.getFileUrl(),list.get(i).getOrg_code());
+            }
+        }
+    }
+
+
+    /**
+     * 一次性方法 清洗数据
+     * @author wzn
+     * @date 2024/6/19 13:35
+     */
+    public ResultInfo signConfirmation2(String qsId,String filePath,String orgCode){
+        //SysUser sysUser = sysUserService.getUser();
+
+        QsOrgConfirmation qsOrgConfirmation = qsOrgConfirmationService.getById(qsId);
+        //上传
+        String contractId = signService.uploadContract_zjqs(filePath, "");
+        if(StrUtil.isEmpty(contractId)){
+            return ResultInfo.error("确认书上传失败！");
+        }
+        qsOrgConfirmation.setFddContractId(contractId);
+
+
+        //机构签章1
+        NetTagRegister register = registerService.getOne(Wrappers.<NetTagRegister>lambdaQuery().eq(NetTagRegister::getUser_id,orgCode).eq(NetTagRegister::getIs_del, 0));
+        JSONObject object = signService.autoSignZjqs(register.getCompany_customer_id(), contractId, "", "0", "乙方", "2","75","2");
+        String result = (String) object.get("result");
+        log.info("机构签章1" + result);
+        if (result.equals("success")) {
+            //qsOrgConfirmation.setOrg_sign_time(DateUtil.formatDateTime(new Date()));
+            qsOrgConfirmation.setStatus("2");
+            qsOrgConfirmation.setUpdateTime(new Date());
+        }else{
+            String msg = (String) object.get("msg");
+            return ResultInfo.error(msg);
+        }//机构签章2
+        JSONObject object_2 = signService.autoSignZjqs(register.getCompany_customer_id(), contractId, "", "0", "定点医疗机构：", "2","50","2");
+        String result_2 = (String) object_2.get("result");
+        log.info("机构签章2" + result_2);
+        if (result_2.equals("success")) {
+            //qsOrgConfirmation.setOrg_sign_time(DateUtil.formatDateTime(new Date()));
+        }else{
+            String msg = (String) object_2.get("msg");
+            return ResultInfo.error(msg);
+        }
+        //所属医保中心签章
+        NetTagRegister register_centrl = registerService.getOne(Wrappers.<NetTagRegister>lambdaQuery().eq(NetTagRegister::getUser_id, qsOrgConfirmation.getAdmdvs()).eq(NetTagRegister::getIs_del, 0));
+        JSONObject object_centrl = signService.autoSignZjqs(register_centrl.getCompany_customer_id(), contractId, "", "0", "甲方", "2","75","2");
+        String result_centrl = (String) object_centrl.get("result");
+        log.info("所属医保中心签章"+result_centrl);
+        if (result_centrl.equals("success")) {
+            qsOrgConfirmation.setDown_pdf_path(object.getString("download_url"));
+            qsOrgConfirmation.setCentre_pdf_path(object.getString("viewpdf_url"));
+            //qsOrgConfirmation.setCentre_sign_time(DateUtil.formatDateTime(new Date()));
+            qsOrgConfirmation.setStatus("3");
+            qsOrgConfirmation.setUpdateTime(new Date());
+        }else{
+            String msg = (String) object_centrl.get("msg");
+            return ResultInfo.error(msg);
+        }
+        qsOrgConfirmation.updateById();
+        return ResultInfo.success(qsOrgConfirmation.getCentre_pdf_path());
+    }
+
+    /**
+     * 签章
+     */
+    @RequestMapping("/signConfirmation")
+    public ResultInfo signConfirmation(String qsId,String filePath){
+        SysUser sysUser = sysUserService.getUser();
+        QsOrgConfirmation qsOrgConfirmation = qsOrgConfirmationService.getById(qsId);
+        //上传
+        String contractId = signService.uploadContract_zjqs(filePath, "");
+        if(StrUtil.isEmpty(contractId)){
+            return ResultInfo.error("确认书上传失败！");
+        }
+        qsOrgConfirmation.setFddContractId(contractId);
+
+
+        //机构签章1
+        NetTagRegister register = registerService.getOne(Wrappers.<NetTagRegister>lambdaQuery().eq(NetTagRegister::getUser_id, sysUser.getOrg_code()).eq(NetTagRegister::getIs_del, 0));
+        if(null == register){
+            return ResultInfo.error("未查询到签章认证信息！");
+        }
+        JSONObject object = signService.autoSignZjqs(register.getCompany_customer_id(), contractId, "", "0", "乙方", "2","75","2");
+        String result = (String) object.get("result");
+        if (result.equals("success")) {
+            qsOrgConfirmation.setOrg_sign_time(DateUtil.formatDateTime(new Date()));
+            qsOrgConfirmation.setStatus("2");
+            qsOrgConfirmation.setUpdateTime(new Date());
+        }else{
+            String msg = (String) object.get("msg");
+            return ResultInfo.error(msg);
+        }//机构签章2
+        JSONObject object_2 = signService.autoSignZjqs(register.getCompany_customer_id(), contractId, "", "0", "定点医药机构：", "2","50","2");
+        String result_2 = (String) object_2.get("result");
+        if (result_2.equals("success")) {
+            qsOrgConfirmation.setOrg_sign_time(DateUtil.formatDateTime(new Date()));
+        }else{
+            String msg = (String) object_2.get("msg");
+            return ResultInfo.error(msg);
+        }
+        //所属医保中心签章
+        NetTagRegister register_centrl = registerService.getOne(Wrappers.<NetTagRegister>lambdaQuery().eq(NetTagRegister::getUser_id, qsOrgConfirmation.getAdmdvs()).eq(NetTagRegister::getIs_del, 0));
+        JSONObject object_centrl = signService.autoSignZjqs(register_centrl.getCompany_customer_id(), contractId, "", "0", "甲方", "2","75","2");
+        String result_centrl = (String) object_centrl.get("result");
+        if (result_centrl.equals("success")) {
+            qsOrgConfirmation.setDown_pdf_path(object.getString("download_url"));
+            qsOrgConfirmation.setCentre_pdf_path(object.getString("viewpdf_url"));
+            qsOrgConfirmation.setCentre_sign_time(DateUtil.formatDateTime(new Date()));
+            qsOrgConfirmation.setStatus("3");
+            qsOrgConfirmation.setUpdateTime(new Date());
+        }else{
+            String msg = (String) object_centrl.get("msg");
+            return ResultInfo.error(msg);
+        }
+        qsOrgConfirmation.updateById();
+        return ResultInfo.success(qsOrgConfirmation.getCentre_pdf_path());
+    }
+
+
+
+    /**
+     *清算确认导出
+     * Author wzn
+     * Date 2023/1/18 16:19
+     */
+    @RequestMapping("/exportList")
+    public void exportList(HttpServletResponse response, QsOrgConfirmation qsOrgConfirmation) throws Exception{
+        QueryWrapper qw = new QueryWrapper<SettleAbnormal>();
+        if(StringUtils.isNotEmpty(qsOrgConfirmation.getOrg_code())){
+            qw.eq("org_code",qsOrgConfirmation.getOrg_code());
+        }
+        if(StringUtils.isNotEmpty(qsOrgConfirmation.getOrg_name())){
+            qw.eq("org_name",qsOrgConfirmation.getOrg_name());
+        }
+        if(StringUtils.isNotEmpty(qsOrgConfirmation.getAdmdvs())){
+            qw.eq("admdvs",qsOrgConfirmation.getAdmdvs());
+        }
+        if(StringUtils.isNotEmpty(qsOrgConfirmation.getStatus())){
+            qw.eq("status",qsOrgConfirmation.getStatus());
+        }
+        List<QsOrgConfirmation> details = qsOrgConfirmationService.list(qw);
+        if(CollectionUtil.isNotEmpty(details)){
+            for(QsOrgConfirmation a:details){
+                if(StringUtils.isNotEmpty(a.getAdmdvs())){
+                    SysDict sysDict = new SysDict() ;
+                    sysDict.setDict_type("admdvs-area");
+                    sysDict.setValue(a.getAdmdvs());
+                    SysDict sysDict1 = sysDictService.selectByValue(sysDict) ;
+                    if(null != sysDict1){
+                        a.setAdmdvs(sysDict1.getLabel());
+                    }
+                }
+                if(StringUtils.isNotEmpty(a.getStatus())){
+                    if("1".equals(a.getStatus())){
+                        a.setStatus("待提交");
+                    }else if("2".equals(a.getStatus())){
+                        a.setStatus("已提交");
+                    }else if("3".equals(a.getStatus())){
+                        a.setStatus("已审核");
+                    }
+                }
+
+            }
+        }
+        // 通过工具类创建writer，默认创建xls格式
+        BigExcelWriter writer = (BigExcelWriter) ExcelUtil.getBigWriter();
+        writer.addHeaderAlias("org_code", "机构编码");
+        writer.addHeaderAlias("org_name", "机构名称");
+        writer.addHeaderAlias("year", "年份");
+        writer.addHeaderAlias("admdvs", "统筹区");
+        writer.addHeaderAlias("org_sign_time", "机构签章时间");
+        writer.addHeaderAlias("centre_sign_time", "医保中心签章时间");
+        writer.addHeaderAlias("status", "确认书状态");
+        //只导出定义字段
+        writer.setOnlyAlias(true) ;
+        // 一次性写出内容，使用默认样式，强制输出标题
+        writer.write(details, true);
+        //out为OutputStream，需要写出到的目标流
+        //response为HttpServletResponse对象
+        response.setContentType("application/vnd.ms-excel;charset=utf-8");
+        //test.xls是弹出下载对话框的文件名，不能为中文，中文请自行编码
+        response.setHeader("Content-Disposition", "attachment;filename=test.xls");
+        ServletOutputStream out = response.getOutputStream();
+        writer.flush(out, true);
+        // 关闭writer，释放内存
+        writer.close();
+        //此处记得关闭输出Servlet流
+        IoUtil.close(out);
+    }
+
+}

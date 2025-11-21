@@ -1,0 +1,259 @@
+<template>
+  <div class="main-container">
+    <el-row :gutter="20">
+      <el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+        <el-card class="card" shadow="never">
+          <div slot="header">
+            <span class="tips">查询条件</span>
+            <vab-icon
+              :icon="['fas', 'angle-up']"
+              v-if="isShow"
+              @click="moreQuery"
+            ></vab-icon>
+            <vab-icon
+              :icon="['fas', 'angle-down']"
+              v-else
+              @click="moreQuery"
+            ></vab-icon>
+          </div>
+          <el-form  :model="queryForm" ref="queryForm" label-width="160px">
+            <el-row :gutter="20">
+              <el-col :xs="24" :sm="24" :md="8" :lg="8" :xl="8">
+                <el-form-item label="医保目录编码">
+                  <el-input
+                    v-model.trim="queryForm.hilist_code"
+                    @keyup.enter.native="queryData"
+                  />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <vab-query-form>
+              <vab-query-form-right-panel :span="24">
+                <el-form-item class="mr0">
+                  <el-button icon="el-icon-refresh-left">重 置</el-button>
+                  <el-button icon="el-icon-search" @click="queryData" type="primary">
+                    查 询
+                  </el-button>
+                </el-form-item>
+              </vab-query-form-right-panel>
+            </vab-query-form>
+          </el-form>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+        <el-card class="card" shadow="never">
+          <div slot="header">
+            <span class="tips">医保目录信息表</span>
+<!--            <el-button type="success" class="right" icon="el-icon-plus" @click="handleAdd">新增</el-button>-->
+          </div>
+          <el-table
+            v-loading="listLoading"
+            ref="listTable"
+            stripe
+            :data="list"
+            :element-loading-text="elementLoadingText"
+            highlight-current-row
+            border
+            @current-change="handleCurrentChange"
+            height="420px"
+          >
+            <template slot="empty">
+                <el-empty :image-size="200"></el-empty>
+            </template>
+            <!-- <el-table-column show-overflow-tooltip type="selection"></el-table-column> -->
+            <el-table-column
+              show-overflow-tooltip
+              type="index"
+              label="序号"
+              align="center"
+              width="80px"
+              prop="id"
+            >
+              <template #default="scope">
+              {{ (queryForm.pageNo - 1) * queryForm.pageSize + scope.$index + 1 }}
+            </template></el-table-column>
+            <el-table-column
+                show-overflow-tooltip
+                label="医保目录编码"
+                align="center"
+                prop="hilist_code"
+            >
+            </el-table-column>
+            <el-table-column
+              show-overflow-tooltip              
+              label="医保目录名称"
+              align="center"
+              prop="hilist_name"
+            >
+            </el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="med_chrgitm_tYPE"
+              width="120px"
+              label="医疗收费项目类别"
+              align="center"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="list_type"
+              label="目录类别 "
+              align="center"
+              width="120px"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              prop="hilist_use_tyPE"
+              label="限复方使用类型"
+              align="center"
+              width="120px"
+            ></el-table-column>
+<!--            <el-table-column-->
+<!--              show-overflow-tooltip-->
+<!--              prop="wubi"-->
+<!--              label="五笔助记码"-->
+<!--              align="center"-->
+<!--              width="200px"-->
+<!--            ></el-table-column>-->
+<!--            <el-table-column-->
+<!--              show-overflow-tooltip-->
+<!--              prop="pinyin"-->
+<!--              label="拼音助记码"-->
+<!--              align="center"-->
+<!--              width="180px"-->
+<!--            ></el-table-column>-->
+<!--            <el-table-column-->
+<!--              show-overflow-tooltip-->
+<!--              prop="updt_time"-->
+<!--              label="数据更新时间"-->
+<!--              align="center"-->
+<!--              width="120px"-->
+<!--            ></el-table-column>-->
+<!--            <el-table-column-->
+<!--              show-overflow-tooltip-->
+<!--              prop="crter_name"-->
+<!--              align="center"-->
+<!--              label="创建人姓名"-->
+<!--            ></el-table-column>-->
+            <el-table-column
+                    show-overflow-tooltip
+                    prop="opter_name"
+                    align="center"
+                    label="经办人姓名"
+            ></el-table-column>
+<!--            <el-table-column-->
+<!--                    show-overflow-tooltip-->
+<!--                    prop="optins_no"-->
+<!--                    align="center"-->
+<!--                    label="经办机构编号"-->
+<!--            ></el-table-column>-->
+            <el-table-column
+                    show-overflow-tooltip
+                    prop="poolarea_no"
+                    align="center"
+                    label="统筹区编号"
+            ></el-table-column>
+            <el-table-column
+              show-overflow-tooltip
+              label="操作"
+              width="160"
+              align="center"
+              fixed="right"
+            >
+              <template #default="{ row }">
+                <el-button
+                  plain
+                  @click="handlechuli(row)"
+                  type="primary"
+                  size="mini"
+                >
+                  查看
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>          
+          <el-pagination
+            background
+            :current-page="queryForm.pageNo"
+            :page-size="queryForm.pageSize"
+            :layout="layout"
+            :total="total"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange2"
+          ></el-pagination>
+        </el-card>
+      </el-col>
+    </el-row>
+    <!--<cardnum ref="cardnum" @fetch-data="fetchData"></cardnum>-->
+    <views ref="views" @fetch-data="fetchData"></views>
+  </div>
+</template>
+
+<script>
+  /*import Cardnum from '@/components/cardno'*/
+  import Views from './components/view'
+  import {queryPage} from '@/api/personinfo'
+
+  export default {
+  name: 'Index',
+components: {Views},
+  data() {
+    return {
+      value1: '',
+      checked: false,
+      isShow: false,
+      list: null,
+      listLoading: false,
+      layout: 'total, sizes, prev, pager, next, jumper',
+      total: 0,
+      selectRows: '',
+      elementLoadingText: '正在加载...',
+      cardTypes:[],//证件类型
+      queryForm: {
+        pageNo: 1,
+        pageSize: 10,
+        username: '',
+        cardType: '01',
+      },
+    }
+  },
+  beforeDestroy() {},
+  mounted() {},
+  methods: {
+    handleCurrentChange(val) {
+      this.selectRows = val
+    },
+    openwin(){
+      this.$refs['cardnum'].showDia()
+    },
+
+    handleSizeChange(val) {
+      this.queryForm.pageSize = val
+      this.fetchData()
+    },
+    handleCurrentChange2(val) {
+      this.queryForm.pageNo = val
+      this.fetchData()
+    },
+    handlechuli(row){
+      this.$refs['views'].showDia(row)
+    },
+    queryData() {
+      this.queryForm.pageNo = 1
+      this.fetchData(this.queryForm)
+    },
+    moreQuery() {
+      this.isShow = !this.isShow
+    },
+
+    async fetchData() {
+      this.listLoading = true
+      const res = await queryPage(this.queryForm)
+      this.list = res.data.records;
+      this.total = res.data.total;
+      setTimeout(() => {
+        this.listLoading = false
+      }, 300)
+    },
+  },
+}
+</script>

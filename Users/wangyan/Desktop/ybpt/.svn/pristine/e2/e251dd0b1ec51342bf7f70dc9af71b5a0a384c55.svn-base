@@ -1,0 +1,99 @@
+import request from '@/utils/request_civil'
+
+export function getList(data) {
+    return request({
+        url: '/pack/getList', method: 'post', params: data,
+    })
+}
+//获取已机构套餐上架/未上架
+export function getSelectOrgList(data) {
+    return request({
+        url: '/pack/getSelectOrgList', method: 'post', params: data,
+    })
+}
+
+export function getEntity(data) {
+    return request({
+        url: '/pack/getEntity', method: 'post', data,
+    })
+}
+
+export function setOrgOption(data) {
+    return request({
+        url: '/pack/setOrgOption', method: 'post', params: data,
+    })
+}
+
+export function toEdit(data) {
+    return request({
+        url: '/pack/toEdit', method: 'post', params: data,
+    })
+}
+
+export function edit(data) {
+    return request({
+        url: '/pack/edit', method: 'post', data,
+    })
+}
+// 机构端配置规则接口
+export function addCommit(data) {
+    return request({
+        url: '/orgSubscribeRules/addOrgSubscribeRules', method: 'post', data,
+    })
+}
+//机构端配置规则接口回显
+export function getOrgSubscribeRules() {
+    return request({
+        url: '/orgSubscribeRules/getOrgSubscribeRulesList', method: 'post',
+    })
+}
+//根据机构返回配置规则接口回显
+export function getRulesListByOrgId(data) {
+    return request({
+        url: '/orgSubscribeRules/getRulesListByOrgId', method: 'post', data,
+    })
+}
+export function getOrgList1(data) {
+    return request({
+        url: '/pack/getOrgList1', method: 'get',
+        params: {
+            packYear: data.year,
+            packSource: data.source,
+        },
+    })
+}
+
+export function getPackInfoList(data) {
+    return request({
+        url: '/pack/getPackInfoList', method: 'get',
+        params: {
+            packYear: data.year,
+            packSource: data.source,
+            orgId: data.orgId,
+        },
+    })
+}
+export function getDeptList(data) {
+    return request({
+        url: '/pack/getDeptList', method: 'post',
+        params:data,
+    })
+}
+
+export function findSubRules(data) {
+    return request({
+        url: '/orgSubscribeRules/findSubRules', method: 'get',
+        params: {
+            id: data.org_id,
+            state: data.state,
+        },
+    })
+}
+
+
+export function getOrgListPack(data) {
+    return request({
+        url: '/pack/getOrgListPack', method: 'get', params: data,
+    })
+}
+

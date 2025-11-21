@@ -1,0 +1,45 @@
+server:
+  port: 8090
+spring:
+  application:
+    name: civilApi
+  profiles:
+    active: api
+#  cloud:
+#    nacos:
+#      discovery:
+#        server-addr: http://10.59.12.42:8848/ #nacos服务器
+#        username: nacos
+#        password: nacos
+  freemarker:
+    suffix: .ftl
+    content-type: text/html
+    charset: utf-8
+    cache: false
+    template-loader-path: classpath:/templates/
+    request-context-attribute: ctx
+#sa-token和redis配置
+sa-token:
+  alone-redis:
+    database: 1
+    # Redis服务器地址
+#    host: 10.59.12.36
+    host: 172.168.95.9
+    #    host: localhost
+    # Redis服务器连接端口
+    port: 6379
+    # Redis服务器连接密码（默认为空）
+    password: 111111
+    # 连接超时时间（毫秒）
+    timeout: 10s
+    jedis:
+      pool:
+        # 连接池最大连接数
+        max-active: 500
+        # 连接池最大阻塞等待时间（使用负值表示没有限制）
+        max-wait: -1ms
+        # 连接池中的最大空闲连接
+        max-idle: 200
+        # 连接池中的最小空闲连接
+        min-idle: 50
+DESKEY: svagvLGJ4p6uDou8

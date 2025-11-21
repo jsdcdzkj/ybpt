@@ -1,0 +1,373 @@
+<template>
+  <div class="nav-bar-container">
+    <el-row :gutter="15">
+      <el-col :xs="4" :sm="6" :md="6" :lg="6" :xl="6">
+        <div class="left-panel">
+          <i
+            :class="collapse ? 'el-icon-s-unfold' : 'el-icon-s-fold'"
+            :title="collapse ? '展开' : '收起'"
+            class="fold-unfold"
+            @click="handleCollapse"
+          ></i>
+          <vab-breadcrumb class="hidden-xs-only" />
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="12" :lg="12" :xl="12">
+        <div class="horizontal-text-carousel">
+          <el-carousel
+            :interval="3000"
+            :autoplay="true"
+            :loop="true"
+            direction="horizontal"
+            indicator-position="none"
+            arrow="never"
+            height="40px"
+          >
+            <el-carousel-item v-for="(text, index) in texts" :key="index">
+              <div class="carousel-text">{{ text }}</div>
+            </el-carousel-item>
+          </el-carousel>
+        </div>
+      </el-col>
+      <el-col :xs="8" :sm="6" :md="6" :lg="6" :xl="6">
+        <div class="right-panel">
+          <!--<el-popover placement="bottom" width="200" trigger="hover" style="margin-right:10px;">-->
+          <!--&lt;!&ndash;<ul class="newsbox">&ndash;&gt;-->
+          <!--&lt;!&ndash;<li :key="item.id" @click="todetail(item.id)" v-for="item in top2NoticeList">&ndash;&gt;-->
+          <!--&lt;!&ndash;<div class="title">{{ item.title }}</div>&ndash;&gt;-->
+          <!--&lt;!&ndash;<div class="time">{{item.launchTime}}</div>&ndash;&gt;-->
+          <!--&lt;!&ndash;</li>&ndash;&gt;-->
+          <!--&lt;!&ndash;</ul>&ndash;&gt;-->
+          <!--&lt;!&ndash;<div align="center"><el-button size="mini" round @click="tomore()">查看更多</el-button></div>&ndash;&gt;-->
+          <!--&lt;!&ndash;            消息提示 先隐藏掉&ndash;&gt;-->
+          <!---->
+          <!--&lt;!&ndash; <el-button slot="reference" icon="el-icon-message-solid" circle></el-button> &ndash;&gt;-->
+          <!--</el-popover>-->
+          <el-badge :value="totalNoticeCount" class="item" slot="reference">
+            <el-button
+              icon="el-icon-bell"
+              circle
+              size="small"
+              @click="open"
+            ></el-button>
+          </el-badge>
+          <vab-error-log />
+          <vab-full-screen-bar @refresh="refreshRoute" />
+          <vab-theme-bar class="hidden-xs-only" />
+          <vab-icon
+            title="重载所有路由"
+            :pulse="pulse"
+            :icon="['fas', 'redo']"
+            @click="refreshRoute"
+          />
+          <vab-avatar />
+          <!--  <vab-icon
+            title="退出系统"
+            :icon="['fas', 'sign-out-alt']"
+            @click="logout"
+          />-->
+        </div>
+      </el-col>
+    </el-row>
+    <dktj ref="dktj"></dktj>
+    <Reminder ref="reminder"></Reminder>
+  </div>
+</template>
+
+<script>
+  import { mapActions, mapGetters } from 'vuex'
+  import Dktj from '@/views/yibaocenter/notices/components/views'
+  import Reminder from '@/views/notices/reminder'
+  import {
+    importData,
+    saveApi,
+    getEntityByIdApi,
+    editApi,
+    getTop2NoticeForAccepterAndTotalCountApi,
+  } from '@/api_check/notice'
+  import { ws_url } from '@/config/setting.config'
+  export default {
+    name: 'VabNavBar',
+    components: { Dktj, Reminder },
+    data() {
+      return {
+        userinfo: {},
+        pulse: false,
+        totalNoticeCount: 0,
+        top2NoticeList: [],
+        texts: [
+          '保密重要，切勿泄露信息',
+          '保密责任人人担，信息安全日日安！',
+          '数据无小事，泄密即事故！',
+        ], // 轮播文字
+      }
+    },
+    created() {
+      this.userinfo = JSON.parse(localStorage.getItem('userinfo'))
+
+      console.log(this.$store.state.user.msgNumber)
+      setTimeout(() => {
+        this.$store.state.user.msgNumber = 5
+      }, 5000)
+      // this.getTop2NoticeForAccepterAndTotalCount();
+    },
+    mounted() {
+      if ('WebSocket' in window) {
+        // this.initWebSocket()
+      } else {
+        alert('当前浏览器 Not support websocket')
+      }
+      // window.top2 = this.getTop2NoticeForAccepterAndTotalCount;
+    },
+    computed: {
+      ...mapGetters({
+        collapse: 'settings/collapse',
+        visitedRoutes: 'tabsBar/visitedRoutes',
+        device: 'settings/device',
+        routes: 'routes/routes',
+      }),
+    },
+    watch: {
+      '$store.state.user.msgNumber': {
+        handler: function (newVal, oldVal) {
+          console.log(newVal, oldVal, 'msgNumber')
+          this.msgN = newVal
+        },
+      },
+    },
+    methods: {
+      getTop2NoticeForAccepterAndTotalCount() {
+        console.log('执行了getTop2NoticeForAccepterAndTotalCount')
+        getTop2NoticeForAccepterAndTotalCountApi().then((res) => {
+          if (res.code == 0) {
+            this.totalNoticeCount = res.data.totalNoticeCount
+            if (this.totalNoticeCount > 0) {
+              this.open()
+            }
+            this.top2NoticeList = res.data.top2NoticeList
+          }
+        })
+      },
+      initWebSocket() {
+        console.log('客户端连接服务器---------->')
+        console.log(ws_url + this.userinfo.username)
+        this.websocket = new WebSocket(ws_url + this.userinfo.username)
+        // 连接错误
+        this.websocket.onerror = this.setErrorMessage
+
+        // 连接成功
+        this.websocket.onopen = this.setOnopenMessage
+
+        // 收到消息的回调
+        this.websocket.onmessage = this.setOnmessageMessage
+
+        // 连接关闭的回调
+        this.websocket.onclose = this.setOncloseMessage
+
+        // 监听窗口关闭事件，当窗口关闭时，主动去关闭websocket连接，防止连接还没断开就关闭窗口，server端会抛异常。
+        window.onbeforeunload = this.onbeforeunload
+      },
+      setErrorMessage() {
+        // 如果报错的话，在这里就可以重新初始化websocket，这就是断线重连
+        this.initWebSocket()
+        console.log(
+          'WebSocket连接发生错误   状态码：' + this.websocket.readyState
+        )
+      },
+      setOnopenMessage() {
+        console.log('WebSocket连接成功    状态码：' + this.websocket.readyState)
+      },
+      setOnmessageMessage(event) {
+        let that = this
+        if (event.data == '我把你来梦') {
+          setTimeout(function () {
+            getTop2NoticeForAccepterAndTotalCountApi().then((res) => {
+              console.log('执行了定时器')
+              if (res.code == 0) {
+                that.totalNoticeCount = res.data.totalNoticeCount
+                that.top2NoticeList = res.data.top2NoticeList
+                if (that.totalNoticeCount > 0) {
+                  that.open()
+                }
+              }
+            })
+          }, 6000)
+        } else if (event.data == '撤销通知') {
+          setTimeout(function () {
+            getTop2NoticeForAccepterAndTotalCountApi().then((res) => {
+              console.log('执行了定时器')
+              if (res.code == 0) {
+                that.totalNoticeCount = res.data.totalNoticeCount
+                that.top2NoticeList = res.data.top2NoticeList
+                console.log(that.totalNoticeCount)
+                if (that.totalNoticeCount == 0) {
+                  that.$refs['reminder'].closeDia()
+                } else {
+                  that.$refs['reminder'].queryDia()
+                }
+              }
+            })
+          }, 1000)
+        }
+        console.log('服务端返回：' + event.data)
+      },
+      setOncloseMessage() {
+        console.log('WebSocket连接关闭    状态码：' + this.websocket.readyState)
+      },
+      onbeforeunload() {
+        this.closeWebSocket()
+      },
+      closeWebSocket() {
+        this.websocket.close()
+      },
+
+      ...mapActions({
+        changeCollapse: 'settings/changeCollapse',
+      }),
+      handleCollapse() {
+        this.changeCollapse()
+      },
+      todetail(id) {
+        if (id) {
+          let row = {
+            id: id,
+          }
+          this.$refs['dktj'].showDia(row)
+        } else {
+          this.$refs['dktj'].showDia()
+        }
+      },
+      tomore() {
+        if (this.userinfo.user_type == '4') {
+          this.$router.push('/notice-yong')
+        }
+
+        if (this.userinfo.user_type == '5') {
+          this.$router.push('/notice-ti')
+        }
+        if (this.userinfo.user_type == '1') {
+          this.$router.push('/notice')
+        }
+        // this.$router.push("/notice")
+      },
+      async refreshRoute() {
+        this.$baseEventBus.$emit('reload-routerview')
+        this.pulse = true
+        setTimeout(() => {
+          this.pulse = false
+        }, 1000)
+      },
+      open() {
+        this.$refs['reminder'].showDia()
+      },
+    },
+  }
+</script>
+
+<style lang="scss" scoped>
+  .nav-bar-container {
+    position: relative;
+    height: $base-nav-bar-height;
+    padding-right: $base-padding;
+    padding-left: $base-padding;
+    overflow: hidden;
+    user-select: none;
+    background: $base-color-white;
+    box-shadow: $base-box-shadow;
+
+    .left-panel {
+      display: flex;
+      align-items: center;
+      justify-items: center;
+      height: $base-nav-bar-height;
+
+      .fold-unfold {
+        color: $base-color-gray;
+        cursor: pointer;
+      }
+
+      ::v-deep {
+        .breadcrumb-container {
+          margin-left: 10px;
+        }
+      }
+    }
+
+    .right-panel {
+      display: flex;
+      align-content: center;
+      align-items: center;
+      justify-content: flex-end;
+      height: $base-nav-bar-height;
+
+      ::v-deep {
+        svg {
+          width: 1em;
+          height: 1em;
+          margin-right: 15px;
+          font-size: $base-font-size-small;
+          color: $base-color-gray;
+          cursor: pointer;
+          fill: $base-color-gray;
+        }
+
+        button {
+          svg {
+            margin-right: 0;
+            color: $base-color-white;
+            cursor: pointer;
+            fill: $base-color-white;
+          }
+        }
+
+        .el-badge {
+          margin-right: 15px;
+        }
+
+        .el-popover {
+          padding: 0 !important;
+        }
+      }
+    }
+  }
+  .horizontal-text-carousel {
+    width: 100%;
+    margin: 10px auto;
+    overflow: hidden;
+  }
+  .carousel-text {
+    color: red;
+    font-size: 36px;
+    font-weight: bold;
+    line-height: 40px; /* 与 el-carousel 高度一致 */
+    white-space: nowrap; /* 禁止换行 */
+    text-align: center;
+    padding: 0 20px; /* 左右留白，避免贴边 */
+    display: inline-block; /* 让长文字能完整滚动 */
+    // animation: scroll-text 15s linear infinite; /* 长文字滚动动画 */
+  }
+
+  /* 长文字滚动动画（可选） */
+  @keyframes scroll-text {
+    0% {
+      transform: translateX(100%);
+    }
+    100% {
+      transform: translateX(-100%);
+    }
+  }
+
+  /* 隐藏默认样式 */
+  .el-carousel__arrow,
+  .el-carousel__indicators {
+    display: none !important;
+  }
+
+  /* 调整 el-carousel-item 样式 */
+  .el-carousel__item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible !important; /* 允许文字溢出容器 */
+  }
+</style>

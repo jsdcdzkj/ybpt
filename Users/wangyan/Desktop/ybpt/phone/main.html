@@ -1,0 +1,194 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="divport"
+        content="user-scalable=0,width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no,target-densitydpi=high-dpi" />
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache">
+    <title>个人中心</title>
+    <meta name="keywords" content="个人中心" />
+    <meta name="description" content="个人中心" />
+    <link rel="stylesheet" href="fonts/iconfont.css">
+    <link rel="stylesheet" href="css/css.css">
+    <script src="js/jquery-1.10.2.min.js" type="text/javascript" charset="utf-8"></script>
+    <script src="js/main.js" type="text/javascript" charset="utf-8"></script>
+</head>
+
+<body>
+    <div class="wrap">
+        <header class="header header-green">
+            <div class="topbar">
+                <span class="btn-left white homeset"><i class="iconfont icon-xiaoxi5"></i></span>
+                <div class="mesinfo">2568</div>
+                <div class="words ellipsis white">首页</div>
+                <div class="rightword white" id="userset"><i class="iconfont icon-shezhi"></i>设置</div>
+            </div>
+        </header>
+        <div class="backbg"></div>
+        <div class="container">
+            <div class="headerbox">
+                <div class="logohead">
+                    <img src="img/touxiang.jpg"></img>
+                    <div class="righthead">
+                        <div class="h3">王某某  <i>L10002</i></div>
+                        <div class="p"><i class="iconfont icon-shouji1"></i>18905124561</div>
+                    </div>
+                </div>
+                <!-- <div class="czbtn" bindtap="gochongzhi">
+                    <span class="iconfont icon-chongzhi2"></span>
+                    <span>去充值</span>
+                </div> -->
+            </div>
+            <ul class="midbox">
+                <li onclick="location.href='fill_info.html'">
+                    <p class="p1"><i class="iconfont icon-shijian5"></i></p>
+                    <p class="p2">预约</p>
+                </li>                    
+                <li onclick="location.href='listpj.html'">
+                    <p class="p1 yellow"><i class="iconfont icon-xiaoxi12"></i></p>
+                    <p class="p2 yellow">评价</p>
+                </li>                  
+            </ul>
+           
+           
+        </div>
+        <div class="maincontWrap">  
+            <div class="mTitle">
+                <h2 style="padding-top:5px">预约列表</h2>
+                <a href="javascript:void(0);" class="t-change huanhuan">查看更多</a>  
+             </div>        
+            <ul class="home-box orderlist active">
+                <li>
+                    <div class="row1">
+                        <div class="ordernum"><span
+                                class="iconfont icon-shijian2"></span><span>某某某体检机构</span>
+                        </div>
+                        <div class="state green">已预约</div>
+                    </div>
+                    <div class="row2">
+                        <div class="item-row">
+                            <span class="p1">套餐年份：</span>
+                            <span class="p2">12345612465</span>
+                        </div>
+                        <div class="item-row">
+                            <span class="p1">套餐金额：</span>
+                            <span class="p2">F6556</span>
+                        </div>
+                        <div class="item-row">
+                            <span class="p1">预约时间：</span>
+                            <span class="p2">F6556</span>
+                        </div>                           
+                    </div>
+                  
+                    <div class="row4">
+                        <div class="btns" onclick="location.href='detail.html'">查看报告</div>           
+                        <div class="btns jiaofei" onclick="yujing()">撤消</div>                          
+                    </div>
+                </li>
+                <li>
+                    <div class="row1">
+                        <div class="ordernum"><span
+                                class="iconfont icon-shijian2"></span><span>某某某体检机构</span>
+                        </div>
+                        <div class="state green">已预约</div>
+                    </div>
+                    <div class="row2">
+                        <div class="item-row">
+                            <span class="p1">套餐年份：</span>
+                            <span class="p2">12345612465</span>
+                        </div>
+                        <div class="item-row">
+                            <span class="p1">套餐金额：</span>
+                            <span class="p2">F6556</span>
+                        </div>
+                        <div class="item-row">
+                            <span class="p1">预约时间：</span>
+                            <span class="p2">F6556</span>
+                        </div>                           
+                    </div>
+                  
+                    <div class="row4">
+                        <div class="btns" onclick="location.href='detail.html'">查看报告</div>           
+                        <div class="btns jiaofei" onclick="yujing()">撤消</div>                          
+                    </div>
+                </li>
+                <li>
+                    <div class="row1">
+                        <div class="ordernum"><span
+                                class="iconfont icon-shijian2"></span><span>某某某体检机构</span>
+                        </div>
+                        <div class="state green">已预约</div>
+                    </div>
+                    <div class="row2">
+                        <div class="item-row">
+                            <span class="p1">套餐年份：</span>
+                            <span class="p2">12345612465</span>
+                        </div>
+                        <div class="item-row">
+                            <span class="p1">套餐金额：</span>
+                            <span class="p2">F6556</span>
+                        </div>
+                        <div class="item-row">
+                            <span class="p1">预约时间：</span>
+                            <span class="p2">F6556</span>
+                        </div>                           
+                    </div>
+                  
+                    <div class="row4">
+                        <div class="btns" onclick="location.href='detail.html'">查看报告</div>           
+                        <div class="btns jiaofei" onclick="yujing()">撤消</div>                          
+                    </div>
+                </li>
+                <li>
+                    <div class="row1">
+                        <div class="ordernum"><span
+                                class="iconfont icon-shijian2"></span><span>某某某体检机构</span>
+                        </div>
+                        <div class="state green">已预约</div>
+                    </div>
+                    <div class="row2">
+                        <div class="item-row">
+                            <span class="p1">套餐年份：</span>
+                            <span class="p2">12345612465</span>
+                        </div>
+                        <div class="item-row">
+                            <span class="p1">套餐金额：</span>
+                            <span class="p2">F6556</span>
+                        </div>
+                        <div class="item-row">
+                            <span class="p1">预约时间：</span>
+                            <span class="p2">F6556</span>
+                        </div>                           
+                    </div>
+                  
+                    <div class="row4">
+                        <div class="btns" onclick="location.href='detail.html'">查看报告</div>           
+                        <div class="btns jiaofei" onclick="yujing()">撤消</div>                          
+                    </div>
+                </li>
+               
+            </ul>
+
+        </div>
+
+
+        <footer class="menu_bar block menu_bar_ticket" id="footer">
+            <div id="home" class="menu-tab-item on">
+              <span class="icon"><i class="iconfont icon-zhuye1"></i></span>
+              <span class="menu-tab-label">首页</span>
+            </div>
+            <div id="rebate" class="menu-tab-item">
+              <span class="icon"><i class="iconfont icon-dingdan"></i></span>
+              <span class="menu-tab-label">预约列表</span>
+            </div>
+            <div id="member" class="menu-tab-item">
+              <span class="icon"><i class="iconfont icon-wode1"></i></span>
+              <span class="menu-tab-label">我的</span>
+            </div>
+          </footer>
+    </div>   
+</body>
+
+</html>
